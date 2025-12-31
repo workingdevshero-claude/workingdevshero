@@ -208,3 +208,14 @@ export function getWorkItemsByUserIdAndStatus(userId: number, statuses: string[]
   const placeholders = statuses.map(() => "?").join(", ");
   return db.prepare(`SELECT * FROM work_items WHERE user_id = ? AND status IN (${placeholders}) ORDER BY created_at DESC`).all(userId, ...statuses) as WorkItem[];
 }
+
+// Check if a transaction signature has already been used
+export function isTransactionUsed(signature: string): boolean {
+  const result = db.prepare("SELECT id FROM work_items WHERE transaction_signature = ?").get(signature);
+  return result !== undefined;
+}
+
+// Get pending payment work items created after a specific time
+export function getPendingPaymentItemsAfter(afterTime: string): WorkItem[] {
+  return db.prepare("SELECT * FROM work_items WHERE status = 'pending_payment' AND created_at >= ?").all(afterTime) as WorkItem[];
+}

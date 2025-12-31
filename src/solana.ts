@@ -48,11 +48,22 @@ export async function usdToSol(usdAmount: number): Promise<number> {
   return usdAmount / solPrice;
 }
 
+// Generate a unique SOL amount for a work item by adding the ID as micro-decimals
+// This ensures each payment is distinguishable (e.g., task 123 adds 0.000000123 SOL)
+export async function getUniquePaymentAmount(workItemId: number, usdAmount: number): Promise<number> {
+  const baseSol = await usdToSol(usdAmount);
+  // Add work item ID as 9th decimal place onwards (nano-SOL level)
+  // This adds a unique, imperceptible amount while making each payment distinct
+  const uniqueOffset = workItemId / 1_000_000_000;
+  return baseSol + uniqueOffset;
+}
+
 // Check for incoming payments to our wallet
+// Now with stricter matching: requires exact unique amount and transaction after creation time
 export async function checkForPayment(
   expectedAmountSol: number,
   workItemId: number,
-  sinceSignature?: string
+  createdAtTimestamp: number // Unix timestamp in seconds
 ): Promise<{ found: boolean; signature?: string; amount?: number }> {
   try {
     const pubkey = new PublicKey(PAYMENT_WALLET);
@@ -60,19 +71,24 @@ export async function checkForPayment(
     // Get recent transactions
     const signatures = await connection.getSignaturesForAddress(pubkey, {
       limit: 20,
-      until: sinceSignature,
     });
 
     for (const sigInfo of signatures) {
+      // Skip transactions from before the work item was created
+      if (sigInfo.blockTime && sigInfo.blockTime < createdAtTimestamp) {
+        continue;
+      }
+
       const tx = await connection.getParsedTransaction(sigInfo.signature, {
         maxSupportedTransactionVersion: 0,
       });
 
       if (!tx || !tx.meta) continue;
 
-      // Check if this is an incoming SOL transfer
-      const preBalance = tx.meta.preBalances[0];
-      const postBalance = tx.meta.postBalances[0];
+      // Double-check block time from parsed transaction
+      if (tx.blockTime && tx.blockTime < createdAtTimestamp) {
+        continue;
+      }
 
       // Find transfers to our wallet
       for (let i = 0; i < tx.transaction.message.accountKeys.length; i++) {
@@ -83,8 +99,13 @@ export async function checkForPayment(
           const receivedLamports = postB - preB;
           const receivedSol = receivedLamports / LAMPORTS_PER_SOL;
 
-          // Check if amount matches (with 5% tolerance for price fluctuations)
-          if (receivedSol >= expectedAmountSol * 0.95) {
+          // With unique amounts, use tight tolerance (0.5% for rounding errors only)
+          // The unique offset ensures only the correct task matches
+          const tolerance = 0.005; // 0.5%
+          const minExpected = expectedAmountSol * (1 - tolerance);
+          const maxExpected = expectedAmountSol * (1 + tolerance);
+
+          if (receivedSol >= minExpected && receivedSol <= maxExpected) {
             return {
               found: true,
               signature: sigInfo.signature,

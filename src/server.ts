@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
-import { createWorkItem, getWorkItemById, getPaidItems, updateWorkItemStatus, updateWorkItemPayment, getWorkItemsByUserId, getWorkItemsByUserIdAndStatus, type User } from "./db";
-import { PAYMENT_WALLET, getSolPrice, usdToSol, checkForPayment, getWalletBalance } from "./solana";
+import { createWorkItem, getWorkItemById, getPaidItems, updateWorkItemStatus, updateWorkItemPayment, getWorkItemsByUserId, getWorkItemsByUserIdAndStatus, isTransactionUsed, type User } from "./db";
+import { PAYMENT_WALLET, getSolPrice, usdToSol, getUniquePaymentAmount, checkForPayment, getWalletBalance } from "./solana";
 import { registerUser, loginUser, logoutUser, validateSession, getSessionFromCookie, createSessionCookie, createLogoutCookie } from "./auth";
 
 const app = new Hono();
@@ -474,7 +474,8 @@ app.get("/payment/:id", async (c) => {
   }
 
   const solPrice = await getSolPrice();
-  const costSol = await usdToSol(workItem.cost_usd);
+  // Use unique payment amount tied to this specific work item
+  const costSol = await getUniquePaymentAmount(workItem.id, workItem.cost_usd);
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -655,7 +656,7 @@ app.get("/payment/:id", async (c) => {
       <div class="payment-details">
         <h3>Send exactly:</h3>
         <div class="amount">
-          <div class="sol">${costSol.toFixed(6)} SOL</div>
+          <div class="sol">${costSol.toFixed(9)} SOL</div>
           <div class="usd">≈ $${workItem.cost_usd.toFixed(2)} USD</div>
         </div>
 
@@ -734,11 +735,22 @@ app.get("/api/check-payment/:id", async (c) => {
     return c.json({ paid: true });
   }
 
-  // Check blockchain for payment
-  const costSol = await usdToSol(workItem.cost_usd);
-  const result = await checkForPayment(costSol, workItem.id);
+  // Use unique payment amount for this specific work item
+  const costSol = await getUniquePaymentAmount(workItem.id, workItem.cost_usd);
+
+  // Convert creation time to Unix timestamp (seconds)
+  const createdAtTimestamp = Math.floor(new Date(workItem.created_at).getTime() / 1000);
+
+  // Check blockchain for payment with timestamp filter
+  const result = await checkForPayment(costSol, workItem.id, createdAtTimestamp);
 
   if (result.found && result.signature) {
+    // Verify this transaction hasn't already been used for another task
+    if (isTransactionUsed(result.signature)) {
+      console.log(`Transaction ${result.signature} already used for another task`);
+      return c.json({ paid: false, error: "Transaction already used" });
+    }
+
     updateWorkItemPayment(workItem.id, result.signature, result.amount!);
     return c.json({ paid: true, signature: result.signature });
   }
