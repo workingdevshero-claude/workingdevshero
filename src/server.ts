@@ -581,6 +581,24 @@ app.get("/payment/:id", async (c) => {
       opacity: 0.9;
     }
 
+    .qr-code {
+      text-align: center;
+      margin: 25px 0;
+    }
+
+    .qr-code img {
+      background: white;
+      padding: 15px;
+      border-radius: 15px;
+      max-width: 200px;
+    }
+
+    .qr-code p {
+      margin-top: 10px;
+      color: #a0aec0;
+      font-size: 0.85rem;
+    }
+
     .task-preview {
       background: rgba(255,255,255,0.05);
       padding: 20px;
@@ -657,7 +675,12 @@ app.get("/payment/:id", async (c) => {
           <div class="usd">≈ $${workItem.cost_usd.toFixed(2)} USD</div>
         </div>
 
-        <h3>To this address:</h3>
+        <div class="qr-code">
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=solana:${PAYMENT_WALLET}?amount=${costSol.toFixed(9)}" alt="Solana Payment QR Code">
+          <p>Scan with your Solana wallet</p>
+        </div>
+
+        <h3>Or send to this address:</h3>
         <div class="address" id="address">${PAYMENT_WALLET}</div>
         <button class="copy-button" onclick="copyAddress()">Copy Address</button>
       </div>
