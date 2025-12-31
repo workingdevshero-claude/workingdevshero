@@ -7,18 +7,35 @@ const connection = new Connection(SOLANA_RPC_URL, "confirmed");
 // Our payment wallet address
 export const PAYMENT_WALLET = "4ym27TW1CzsV42sFvbMwSMRwiWsEu5tHFkeYJYoqozcf";
 
+// Cached SOL price to avoid hitting rate limits
+let cachedSolPrice: { price: number; timestamp: number } | null = null;
+const CACHE_DURATION_MS = 60000; // 1 minute cache
+
 // Get current SOL price in USD (simplified - in production, use a price oracle)
 export async function getSolPrice(): Promise<number> {
+  // Return cached price if still valid
+  if (cachedSolPrice && Date.now() - cachedSolPrice.timestamp < CACHE_DURATION_MS) {
+    return cachedSolPrice.price;
+  }
+
   try {
     const response = await fetch(
       "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
     );
     const data = await response.json();
-    return data.solana.usd;
+
+    if (data?.solana?.usd) {
+      cachedSolPrice = { price: data.solana.usd, timestamp: Date.now() };
+      return data.solana.usd;
+    }
+
+    // API returned unexpected format
+    console.warn("Unexpected SOL price API response, using fallback");
+    return cachedSolPrice?.price || 190; // Use cached or fallback
   } catch (error) {
     console.error("Error fetching SOL price:", error);
     // Fallback price if API fails
-    return 200;
+    return cachedSolPrice?.price || 190;
   }
 }
 
