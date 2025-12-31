@@ -78,7 +78,7 @@ Please proceed with the task now.`;
 
   console.log(`Starting Claude Code for task (max ${maxMinutes} min)...`);
 
-  const proc = Bun.spawn(["claude", "-p", prompt, "--output-format", "stream-json", "--verbose", "--no-session-persistence"], {
+  const proc = Bun.spawn(["claude", "-p", prompt, "--output-format", "stream-json", "--verbose", "--no-session-persistence", "--allowedTools", "WebSearch,WebFetch,Read,Write,Edit,Bash,Glob,Grep"], {
     cwd: process.env.HOME || "/home/claude",
     env: { ...process.env },
     stdout: "pipe",

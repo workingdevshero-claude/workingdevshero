@@ -309,8 +309,8 @@ app.get("/", async (c) => {
       <p>Set your maximum time budget and only pay for what you use. Transparent pricing at $6/hour ($0.10/minute).</p>
     </div>
     <div class="feature-card">
-      <h3>Instant Crypto Payments</h3>
-      <p>Pay with Solana for fast, low-fee transactions. Get your results delivered directly to your email.</p>
+      <h3>Results via Email</h3>
+      <p>Sign up, submit your task, and get results delivered directly to your inbox when complete.</p>
     </div>
   </section>
 
@@ -319,16 +319,17 @@ app.get("/", async (c) => {
       <h2>Simple, Transparent Pricing</h2>
       <div class="price-tag">$6 <span>/ hour</span></div>
       <p style="color: #a0aec0; margin-bottom: 10px;">That's just $0.10 per minute of AI development time</p>
-      <p style="color: #a0aec0;">Current SOL price: $${solPrice.toFixed(2)}</p>
+      <p style="color: #a0aec0;">Currently in beta - free for registered users!</p>
     </div>
   </section>
 
   <section class="form-section" id="submit">
     <h2>Submit Your Task</h2>
+    ${user ? `
     <form id="taskForm">
       <div class="form-group">
-        <label for="email">Email Address (for results)</label>
-        <input type="email" id="email" name="email" required placeholder="you@example.com">
+        <label>Results will be sent to</label>
+        <div style="padding: 15px; background: rgba(255,255,255,0.05); border-radius: 10px; color: #00d4ff;">${user.email}</div>
       </div>
 
       <div class="form-group">
@@ -344,11 +345,17 @@ app.get("/", async (c) => {
       <div class="cost-preview">
         <p>Estimated Cost</p>
         <div class="amount">$<span id="costUsd">1.00</span></div>
-        <p style="color: #a0aec0;">≈ <span id="costSol">0.005</span> SOL</p>
       </div>
 
-      <button type="submit" class="submit-button">Submit & Get Payment Details</button>
+      <button type="submit" class="submit-button">Submit Task</button>
     </form>
+    ` : `
+    <div style="text-align: center; padding: 40px;">
+      <p style="color: #a0aec0; margin-bottom: 20px;">Please log in or create an account to submit tasks.</p>
+      <a href="/auth/login" class="cta-button" style="margin-right: 10px;">Login</a>
+      <a href="/auth/register" class="cta-button">Sign Up</a>
+    </div>
+    `}
   </section>
 
   <footer>
@@ -358,55 +365,58 @@ app.get("/", async (c) => {
   </footer>
 
   <script>
-    const solPrice = ${solPrice};
     const ratePerMinute = 0.10;
 
     const minutesInput = document.getElementById('minutes');
     const costUsdSpan = document.getElementById('costUsd');
-    const costSolSpan = document.getElementById('costSol');
 
     function updateCost() {
+      if (!minutesInput) return;
       const minutes = parseInt(minutesInput.value) || 1;
       const costUsd = (minutes * ratePerMinute).toFixed(2);
-      const costSol = (costUsd / solPrice).toFixed(6);
       costUsdSpan.textContent = costUsd;
-      costSolSpan.textContent = costSol;
     }
 
-    minutesInput.addEventListener('input', updateCost);
+    if (minutesInput) {
+      minutesInput.addEventListener('input', updateCost);
+    }
 
-    document.getElementById('taskForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const form = e.target;
-      const button = form.querySelector('button');
-      button.disabled = true;
-      button.textContent = 'Processing...';
+    const taskForm = document.getElementById('taskForm');
+    if (taskForm) {
+      taskForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const button = form.querySelector('button');
+        button.disabled = true;
+        button.textContent = 'Submitting...';
 
-      try {
-        const response = await fetch('/api/submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: form.email.value,
-            minutes: parseInt(form.minutes.value),
-            task: form.task.value
-          })
-        });
+        try {
+          const response = await fetch('/api/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              minutes: parseInt(form.minutes.value),
+              task: form.task.value
+            })
+          });
 
-        const data = await response.json();
-        if (data.success) {
-          window.location.href = '/payment/' + data.workItemId;
-        } else {
-          alert('Error: ' + data.error);
+          const data = await response.json();
+          if (data.success) {
+            window.location.href = '/status/' + data.workItemId;
+          } else if (data.requiresAuth) {
+            window.location.href = '/auth/login';
+          } else {
+            alert('Error: ' + data.error);
+            button.disabled = false;
+            button.textContent = 'Submit Task';
+          }
+        } catch (error) {
+          alert('Error submitting task. Please try again.');
           button.disabled = false;
-          button.textContent = 'Submit & Get Payment Details';
+          button.textContent = 'Submit Task';
         }
-      } catch (error) {
-        alert('Error submitting task. Please try again.');
-        button.disabled = false;
-        button.textContent = 'Submit & Get Payment Details';
-      }
-    });
+      });
+    }
   </script>
 </body>
 </html>`;
@@ -414,14 +424,20 @@ app.get("/", async (c) => {
   return c.html(html);
 });
 
-// API endpoint to submit work items
+// API endpoint to submit work items (requires authentication)
 app.post("/api/submit", async (c) => {
   try {
-    const body = await c.req.json();
-    const { email, minutes, task } = body;
     const user = getCurrentUser(c);
 
-    if (!email || !minutes || !task) {
+    // Require authentication
+    if (!user) {
+      return c.json({ success: false, error: "Authentication required", requiresAuth: true }, 401);
+    }
+
+    const body = await c.req.json();
+    const { minutes, task } = body;
+
+    if (!minutes || !task) {
       return c.json({ success: false, error: "Missing required fields" }, 400);
     }
 
@@ -430,14 +446,17 @@ app.post("/api/submit", async (c) => {
     }
 
     const costUsd = minutes * RATE_PER_MINUTE_USD;
-    // Include user_id if logged in
-    const workItem = createWorkItem(email, minutes, task, costUsd, PAYMENT_WALLET, user?.id);
+    // Use user's email and mark as paid immediately (no payment flow)
+    const workItem = createWorkItem(user.email, minutes, task, costUsd, PAYMENT_WALLET, user.id);
+
+    // Mark as paid immediately - skip payment flow for authenticated users
+    updateWorkItemPayment(workItem.id, `AUTH-${user.id}-${Date.now()}`, 0);
 
     return c.json({
       success: true,
       workItemId: workItem.id,
       costUsd,
-      paymentAddress: PAYMENT_WALLET,
+      message: "Task submitted and queued for processing",
     });
   } catch (error) {
     console.error("Error submitting work item:", error);
