@@ -6,6 +6,15 @@ import { PAYMENT_WALLET, getSolPrice, usdToSol, checkForPayment, getWalletBalanc
 
 const app = new Hono();
 
+// Worker API authentication
+const WORKER_API_KEY = process.env.WORKER_API_KEY || "";
+
+function verifyWorkerAuth(authHeader: string | undefined): boolean {
+  if (!authHeader || !WORKER_API_KEY) return false;
+  const token = authHeader.replace("Bearer ", "");
+  return token === WORKER_API_KEY;
+}
+
 // Enable CORS
 app.use("*", cors());
 
@@ -876,6 +885,115 @@ app.get("/status/:id", async (c) => {
 </html>`;
 
   return c.html(html);
+});
+
+// ==========================================
+// Worker API Endpoints (for remote worker)
+// ==========================================
+
+// Get pending paid tasks ready to be processed
+app.get("/api/worker/pending", async (c) => {
+  const authHeader = c.req.header("Authorization");
+  if (!verifyWorkerAuth(authHeader)) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const paidItems = getPaidItems();
+  return c.json({
+    items: paidItems.map((item) => ({
+      id: item.id,
+      email: item.email,
+      maxMinutes: item.max_minutes,
+      taskDescription: item.task_description,
+      costUsd: item.cost_usd,
+      costSol: item.cost_sol,
+      status: item.status,
+      createdAt: item.created_at,
+      paidAt: item.paid_at,
+    })),
+  });
+});
+
+// Claim a task (mark as processing)
+app.post("/api/worker/claim/:id", async (c) => {
+  const authHeader = c.req.header("Authorization");
+  if (!verifyWorkerAuth(authHeader)) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const id = parseInt(c.req.param("id"));
+  const workItem = getWorkItemById(id);
+
+  if (!workItem) {
+    return c.json({ error: "Task not found" }, 404);
+  }
+
+  if (workItem.status !== "paid") {
+    return c.json({ error: "Task is not in paid status" }, 400);
+  }
+
+  updateWorkItemStatus(id, "processing", {
+    started_at: new Date().toISOString(),
+  });
+
+  return c.json({ success: true, message: "Task claimed" });
+});
+
+// Complete a task with result
+app.post("/api/worker/complete/:id", async (c) => {
+  const authHeader = c.req.header("Authorization");
+  if (!verifyWorkerAuth(authHeader)) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const id = parseInt(c.req.param("id"));
+  const body = await c.req.json();
+  const { success, output, error } = body;
+
+  const workItem = getWorkItemById(id);
+
+  if (!workItem) {
+    return c.json({ error: "Task not found" }, 404);
+  }
+
+  if (workItem.status !== "processing") {
+    return c.json({ error: "Task is not in processing status" }, 400);
+  }
+
+  updateWorkItemStatus(id, success ? "completed" : "failed", {
+    completed_at: new Date().toISOString(),
+    result: JSON.stringify({ success, output, error }),
+  });
+
+  return c.json({ success: true, message: "Task completed" });
+});
+
+// Get task details (for worker to fetch email info after claiming)
+app.get("/api/worker/task/:id", async (c) => {
+  const authHeader = c.req.header("Authorization");
+  if (!verifyWorkerAuth(authHeader)) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const id = parseInt(c.req.param("id"));
+  const workItem = getWorkItemById(id);
+
+  if (!workItem) {
+    return c.json({ error: "Task not found" }, 404);
+  }
+
+  return c.json({
+    id: workItem.id,
+    email: workItem.email,
+    maxMinutes: workItem.max_minutes,
+    taskDescription: workItem.task_description,
+    costUsd: workItem.cost_usd,
+    costSol: workItem.cost_sol,
+    status: workItem.status,
+    createdAt: workItem.created_at,
+    paidAt: workItem.paid_at,
+    startedAt: workItem.started_at,
+  });
 });
 
 const port = parseInt(process.env.PORT || "3000");

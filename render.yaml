@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: workingdevshero
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/status
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: WORKER_API_KEY
+        sync: false

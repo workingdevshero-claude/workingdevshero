@@ -7,6 +7,7 @@
     "dev": "bun --hot src/server.ts",
     "start": "bun src/server.ts",
     "worker": "bun src/worker.ts",
+    "remote-worker": "bun src/remote-worker.ts",
     "generate-wallet": "bun generate-wallet.ts"
   },
   "devDependencies": {
