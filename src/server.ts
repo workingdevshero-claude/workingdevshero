@@ -319,7 +319,7 @@ app.get("/", async (c) => {
       <h2>Simple, Transparent Pricing</h2>
       <div class="price-tag">$6 <span>/ hour</span></div>
       <p style="color: #a0aec0; margin-bottom: 10px;">That's just $0.10 per minute of AI development time</p>
-      <p style="color: #a0aec0;">Currently in beta - free for registered users!</p>
+      <p style="color: #a0aec0;">Pay with Solana - fast, low fees, instant confirmation!</p>
     </div>
   </section>
 
@@ -402,7 +402,7 @@ app.get("/", async (c) => {
 
           const data = await response.json();
           if (data.success) {
-            window.location.href = '/status/' + data.workItemId;
+            window.location.href = '/payment/' + data.workItemId;
           } else if (data.requiresAuth) {
             window.location.href = '/auth/login';
           } else {
@@ -446,17 +446,14 @@ app.post("/api/submit", async (c) => {
     }
 
     const costUsd = minutes * RATE_PER_MINUTE_USD;
-    // Use user's email and mark as paid immediately (no payment flow)
+    // Create work item with pending_payment status - user must pay via Solana
     const workItem = createWorkItem(user.email, minutes, task, costUsd, PAYMENT_WALLET, user.id);
-
-    // Mark as paid immediately - skip payment flow for authenticated users
-    updateWorkItemPayment(workItem.id, `AUTH-${user.id}-${Date.now()}`, 0);
 
     return c.json({
       success: true,
       workItemId: workItem.id,
       costUsd,
-      message: "Task submitted and queued for processing",
+      message: "Task created - please complete payment",
     });
   } catch (error) {
     console.error("Error submitting work item:", error);
