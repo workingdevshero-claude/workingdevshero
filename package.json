@@ -1,0 +1,25 @@
+{
+  "name": "workingdevshero",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --hot src/server.ts",
+    "start": "bun src/server.ts",
+    "worker": "bun src/worker.ts",
+    "generate-wallet": "bun generate-wallet.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.98.4",
+    "@types/nodemailer": "^7.0.4",
+    "bs58": "^6.0.0",
+    "hono": "^4.11.3",
+    "nodemailer": "^7.0.12"
+  }
+}
