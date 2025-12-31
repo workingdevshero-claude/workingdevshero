@@ -714,6 +714,170 @@ app.get("/api/status", async (c) => {
   });
 });
 
+// API endpoint to get individual task status
+app.get("/api/task/:id", async (c) => {
+  const id = parseInt(c.req.param("id"));
+  const workItem = getWorkItemById(id);
+
+  if (!workItem) {
+    return c.json({ error: "Task not found" }, 404);
+  }
+
+  return c.json({
+    id: workItem.id,
+    status: workItem.status,
+    maxMinutes: workItem.max_minutes,
+    costUsd: workItem.cost_usd,
+    costSol: workItem.cost_sol,
+    createdAt: workItem.created_at,
+    paidAt: workItem.paid_at,
+    startedAt: workItem.started_at,
+    completedAt: workItem.completed_at,
+    hasResult: !!workItem.result,
+  });
+});
+
+// Task status page
+app.get("/status/:id", async (c) => {
+  const id = parseInt(c.req.param("id"));
+  const workItem = getWorkItemById(id);
+
+  if (!workItem) {
+    return c.text("Task not found", 404);
+  }
+
+  const statusColors: Record<string, string> = {
+    pending_payment: "#ffc107",
+    paid: "#00d4ff",
+    processing: "#7c3aed",
+    completed: "#14f195",
+    failed: "#ff6b6b",
+  };
+
+  const statusLabels: Record<string, string> = {
+    pending_payment: "Awaiting Payment",
+    paid: "In Queue",
+    processing: "Processing",
+    completed: "Completed",
+    failed: "Failed",
+  };
+
+  const statusColor = statusColors[workItem.status] || "#666";
+  const statusLabel = statusLabels[workItem.status] || workItem.status;
+  const maskedEmail = workItem.email.replace(/(.{2}).*(@.*)/, "$1***$2");
+  const createdDate = workItem.created_at ? new Date(workItem.created_at).toLocaleString() : "";
+  const paidDate = workItem.paid_at ? new Date(workItem.paid_at).toLocaleString() : "";
+  const startedDate = workItem.started_at ? new Date(workItem.started_at).toLocaleString() : "";
+  const completedDate = workItem.completed_at ? new Date(workItem.completed_at).toLocaleString() : "";
+  const shouldRefresh = workItem.status !== "completed" && workItem.status !== "failed";
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Status - WorkingDevsHero</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      color: #fff;
+      padding: 40px 20px;
+    }
+    .container { max-width: 600px; margin: 0 auto; }
+    .card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 40px;
+    }
+    h1 { text-align: center; margin-bottom: 30px; color: #00d4ff; }
+    .status-badge {
+      display: inline-block;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-weight: 600;
+      background: ${statusColor};
+      color: #1a1a2e;
+      margin-bottom: 20px;
+    }
+    .timeline { margin: 30px 0; }
+    .timeline-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 15px;
+      color: #a0aec0;
+    }
+    .timeline-item.active { color: #fff; }
+    .timeline-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #333;
+      margin-right: 15px;
+    }
+    .timeline-item.active .timeline-dot { background: #14f195; }
+    .timeline-item.current .timeline-dot {
+      background: #00d4ff;
+      box-shadow: 0 0 10px #00d4ff;
+    }
+    .task-info { background: rgba(0,0,0,0.3); padding: 20px; border-radius: 10px; margin-top: 20px; }
+    .task-info p { margin-bottom: 10px; color: #a0aec0; }
+    .task-info strong { color: #fff; }
+    .back-link { display: block; text-align: center; margin-top: 20px; color: #00d4ff; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>Task #${workItem.id}</h1>
+      <div style="text-align: center;">
+        <span class="status-badge">${statusLabel}</span>
+      </div>
+
+      <div class="timeline">
+        <div class="timeline-item ${workItem.created_at ? "active" : ""} ${workItem.status === "pending_payment" ? "current" : ""}">
+          <div class="timeline-dot"></div>
+          <span>Task Created${createdDate ? " - " + createdDate : ""}</span>
+        </div>
+        <div class="timeline-item ${workItem.paid_at ? "active" : ""} ${workItem.status === "paid" ? "current" : ""}">
+          <div class="timeline-dot"></div>
+          <span>Payment Received${paidDate ? " - " + paidDate : ""}</span>
+        </div>
+        <div class="timeline-item ${workItem.started_at ? "active" : ""} ${workItem.status === "processing" ? "current" : ""}">
+          <div class="timeline-dot"></div>
+          <span>Processing Started${startedDate ? " - " + startedDate : ""}</span>
+        </div>
+        <div class="timeline-item ${workItem.completed_at ? "active" : ""} ${workItem.status === "completed" ? "current" : ""}">
+          <div class="timeline-dot"></div>
+          <span>Completed${completedDate ? " - " + completedDate : ""}</span>
+        </div>
+      </div>
+
+      <div class="task-info">
+        <p><strong>Time Budget:</strong> ${workItem.max_minutes} minutes</p>
+        <p><strong>Cost:</strong> $${workItem.cost_usd.toFixed(2)}${workItem.cost_sol ? " (" + workItem.cost_sol.toFixed(6) + " SOL)" : ""}</p>
+        <p><strong>Results will be sent to:</strong> ${maskedEmail}</p>
+      </div>
+
+      ${workItem.status === "pending_payment" ? '<p style="text-align:center;margin-top:20px;"><a href="/payment/' + workItem.id + '" style="color:#00d4ff;">View Payment Details</a></p>' : ""}
+
+      <a href="/" class="back-link">← Back to Home</a>
+    </div>
+  </div>
+  ${shouldRefresh ? `
+  <script>
+    setTimeout(() => location.reload(), 10000);
+  </script>
+  ` : ""}
+</body>
+</html>`;
+
+  return c.html(html);
+});
+
 const port = parseInt(process.env.PORT || "3000");
 console.log(`Server starting on http://localhost:${port}`);
 
