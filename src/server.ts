@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
-import { createWorkItem, getWorkItemById, getPaidItems, updateWorkItemStatus, updateWorkItemPayment } from "./db";
+import { createWorkItem, getWorkItemById, getPaidItems, updateWorkItemStatus, updateWorkItemPayment, getWorkItemsByUserId, getWorkItemsByUserIdAndStatus, type User } from "./db";
 import { PAYMENT_WALLET, getSolPrice, usdToSol, checkForPayment, getWalletBalance } from "./solana";
+import { registerUser, loginUser, logoutUser, validateSession, getSessionFromCookie, createSessionCookie, createLogoutCookie } from "./auth";
 
 const app = new Hono();
 
@@ -13,6 +14,14 @@ function verifyWorkerAuth(authHeader: string | undefined): boolean {
   if (!authHeader || !WORKER_API_KEY) return false;
   const token = authHeader.replace("Bearer ", "");
   return token === WORKER_API_KEY;
+}
+
+// Get current user from session cookie
+function getCurrentUser(c: any): User | null {
+  const cookieHeader = c.req.header("Cookie");
+  const sessionId = getSessionFromCookie(cookieHeader);
+  const { valid, user } = validateSession(sessionId);
+  return valid && user ? user : null;
 }
 
 // Enable CORS
@@ -29,6 +38,7 @@ const RATE_PER_MINUTE_USD = 0.10;
 // Landing page
 app.get("/", async (c) => {
   const solPrice = await getSolPrice();
+  const user = getCurrentUser(c);
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -259,8 +269,17 @@ app.get("/", async (c) => {
 </head>
 <body>
   <header>
-    <div class="container">
+    <div class="container" style="display: flex; justify-content: space-between; align-items: center;">
       <div class="logo">WorkingDevsHero</div>
+      <nav>
+        ${user ? `
+          <a href="/dashboard" style="color: #00d4ff; text-decoration: none; margin-right: 15px;">Dashboard</a>
+          <span style="color: #a0aec0;">${user.email}</span>
+        ` : `
+          <a href="/auth/login" style="color: #00d4ff; text-decoration: none; margin-right: 15px;">Login</a>
+          <a href="/auth/register" style="color: #fff; text-decoration: none; background: linear-gradient(90deg, #00d4ff, #7c3aed); padding: 8px 16px; border-radius: 20px;">Sign Up</a>
+        `}
+      </nav>
     </div>
   </header>
 
@@ -400,6 +419,7 @@ app.post("/api/submit", async (c) => {
   try {
     const body = await c.req.json();
     const { email, minutes, task } = body;
+    const user = getCurrentUser(c);
 
     if (!email || !minutes || !task) {
       return c.json({ success: false, error: "Missing required fields" }, 400);
@@ -410,7 +430,8 @@ app.post("/api/submit", async (c) => {
     }
 
     const costUsd = minutes * RATE_PER_MINUTE_USD;
-    const workItem = createWorkItem(email, minutes, task, costUsd, PAYMENT_WALLET);
+    // Include user_id if logged in
+    const workItem = createWorkItem(email, minutes, task, costUsd, PAYMENT_WALLET, user?.id);
 
     return c.json({
       success: true,
@@ -884,6 +905,720 @@ app.get("/status/:id", async (c) => {
 </body>
 </html>`;
 
+  return c.html(html);
+});
+
+// ==========================================
+// Authentication Routes
+// ==========================================
+
+// Registration page
+app.get("/auth/register", (c) => {
+  const user = getCurrentUser(c);
+  if (user) return c.redirect("/dashboard");
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register - WorkingDevsHero</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 40px;
+      width: 100%;
+      max-width: 400px;
+    }
+    h1 { text-align: center; margin-bottom: 30px; color: #00d4ff; }
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; margin-bottom: 8px; color: #a0aec0; }
+    .form-group input {
+      width: 100%;
+      padding: 15px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.05);
+      color: white;
+      font-size: 1rem;
+    }
+    .form-group input:focus { outline: none; border-color: #00d4ff; }
+    .submit-button {
+      width: 100%;
+      background: linear-gradient(90deg, #00d4ff, #7c3aed);
+      color: white;
+      padding: 15px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+    .submit-button:hover { opacity: 0.9; }
+    .error { background: rgba(255,107,107,0.2); color: #ff6b6b; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+    .links { text-align: center; margin-top: 20px; }
+    .links a { color: #00d4ff; text-decoration: none; }
+    .logo { text-align: center; margin-bottom: 30px; font-size: 1.5rem; font-weight: 700; color: #00d4ff; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">WorkingDevsHero</div>
+    <h1>Create Account</h1>
+    <div id="error" class="error" style="display: none;"></div>
+    <form id="registerForm">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label for="password">Password (min 8 characters)</label>
+        <input type="password" id="password" name="password" required minlength="8">
+      </div>
+      <div class="form-group">
+        <label for="confirmPassword">Confirm Password</label>
+        <input type="password" id="confirmPassword" name="confirmPassword" required>
+      </div>
+      <button type="submit" class="submit-button">Create Account</button>
+    </form>
+    <div class="links">
+      <p>Already have an account? <a href="/auth/login">Login</a></p>
+    </div>
+  </div>
+  <script>
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const errorDiv = document.getElementById('error');
+      const password = form.password.value;
+      const confirmPassword = form.confirmPassword.value;
+
+      if (password !== confirmPassword) {
+        errorDiv.textContent = 'Passwords do not match';
+        errorDiv.style.display = 'block';
+        return;
+      }
+
+      try {
+        const response = await fetch('/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: form.email.value, password })
+        });
+        const data = await response.json();
+        if (data.success) {
+          window.location.href = '/dashboard';
+        } else {
+          errorDiv.textContent = data.error || 'Registration failed';
+          errorDiv.style.display = 'block';
+        }
+      } catch (error) {
+        errorDiv.textContent = 'An error occurred. Please try again.';
+        errorDiv.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>`;
+  return c.html(html);
+});
+
+// Registration API
+app.post("/auth/register", async (c) => {
+  const body = await c.req.json();
+  const { email, password } = body;
+
+  if (!email || !password) {
+    return c.json({ success: false, error: "Email and password required" }, 400);
+  }
+
+  const result = await registerUser(email, password);
+  if (!result.success) {
+    return c.json({ success: false, error: result.error }, 400);
+  }
+
+  // Auto-login after registration
+  const loginResult = await loginUser(email, password);
+  if (!loginResult.success) {
+    return c.json({ success: false, error: "Registration succeeded but login failed" }, 500);
+  }
+
+  return c.json(
+    { success: true },
+    {
+      headers: {
+        "Set-Cookie": createSessionCookie(loginResult.sessionId!),
+      },
+    }
+  );
+});
+
+// Login page
+app.get("/auth/login", (c) => {
+  const user = getCurrentUser(c);
+  if (user) return c.redirect("/dashboard");
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - WorkingDevsHero</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 40px;
+      width: 100%;
+      max-width: 400px;
+    }
+    h1 { text-align: center; margin-bottom: 30px; color: #00d4ff; }
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; margin-bottom: 8px; color: #a0aec0; }
+    .form-group input {
+      width: 100%;
+      padding: 15px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.05);
+      color: white;
+      font-size: 1rem;
+    }
+    .form-group input:focus { outline: none; border-color: #00d4ff; }
+    .submit-button {
+      width: 100%;
+      background: linear-gradient(90deg, #00d4ff, #7c3aed);
+      color: white;
+      padding: 15px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+    .submit-button:hover { opacity: 0.9; }
+    .error { background: rgba(255,107,107,0.2); color: #ff6b6b; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+    .links { text-align: center; margin-top: 20px; }
+    .links a { color: #00d4ff; text-decoration: none; }
+    .logo { text-align: center; margin-bottom: 30px; font-size: 1.5rem; font-weight: 700; color: #00d4ff; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">WorkingDevsHero</div>
+    <h1>Login</h1>
+    <div id="error" class="error" style="display: none;"></div>
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required>
+      </div>
+      <button type="submit" class="submit-button">Login</button>
+    </form>
+    <div class="links">
+      <p>Don't have an account? <a href="/auth/register">Sign Up</a></p>
+    </div>
+  </div>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const errorDiv = document.getElementById('error');
+
+      try {
+        const response = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: form.email.value, password: form.password.value })
+        });
+        const data = await response.json();
+        if (data.success) {
+          window.location.href = '/dashboard';
+        } else {
+          errorDiv.textContent = data.error || 'Login failed';
+          errorDiv.style.display = 'block';
+        }
+      } catch (error) {
+        errorDiv.textContent = 'An error occurred. Please try again.';
+        errorDiv.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>`;
+  return c.html(html);
+});
+
+// Login API
+app.post("/auth/login", async (c) => {
+  const body = await c.req.json();
+  const { email, password } = body;
+
+  if (!email || !password) {
+    return c.json({ success: false, error: "Email and password required" }, 400);
+  }
+
+  const result = await loginUser(email, password);
+  if (!result.success) {
+    return c.json({ success: false, error: result.error }, 400);
+  }
+
+  return c.json(
+    { success: true },
+    {
+      headers: {
+        "Set-Cookie": createSessionCookie(result.sessionId!),
+      },
+    }
+  );
+});
+
+// Logout
+app.post("/auth/logout", (c) => {
+  const cookieHeader = c.req.header("Cookie");
+  const sessionId = getSessionFromCookie(cookieHeader);
+  if (sessionId) {
+    logoutUser(sessionId);
+  }
+  return c.json(
+    { success: true },
+    {
+      headers: {
+        "Set-Cookie": createLogoutCookie(),
+      },
+    }
+  );
+});
+
+app.get("/auth/logout", (c) => {
+  const cookieHeader = c.req.header("Cookie");
+  const sessionId = getSessionFromCookie(cookieHeader);
+  if (sessionId) {
+    logoutUser(sessionId);
+  }
+  return c.redirect("/", {
+    headers: {
+      "Set-Cookie": createLogoutCookie(),
+    },
+  });
+});
+
+// ==========================================
+// Dashboard Routes
+// ==========================================
+
+// Main dashboard
+app.get("/dashboard", async (c) => {
+  const user = getCurrentUser(c);
+  if (!user) return c.redirect("/auth/login");
+
+  const allTasks = getWorkItemsByUserId(user.id);
+  const inProgress = allTasks.filter(t => ["paid", "processing"].includes(t.status));
+  const completed = allTasks.filter(t => ["completed", "failed"].includes(t.status));
+  const pending = allTasks.filter(t => t.status === "pending_payment");
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - WorkingDevsHero</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      color: #fff;
+    }
+    .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+    header {
+      padding: 20px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      margin-bottom: 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo { font-size: 1.5rem; font-weight: 700; color: #00d4ff; }
+    nav a { color: #a0aec0; text-decoration: none; margin-left: 20px; }
+    nav a:hover { color: #00d4ff; }
+    h1 { margin-bottom: 30px; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+    .stat-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 15px;
+      padding: 25px;
+      text-align: center;
+    }
+    .stat-number { font-size: 2.5rem; color: #00d4ff; }
+    .stat-label { color: #a0aec0; margin-top: 5px; }
+    .section { margin-bottom: 40px; }
+    .section h2 { margin-bottom: 20px; font-size: 1.3rem; }
+    .task-list { display: flex; flex-direction: column; gap: 15px; }
+    .task-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .task-info h3 { font-size: 1rem; margin-bottom: 5px; }
+    .task-info p { color: #a0aec0; font-size: 0.9rem; }
+    .task-status {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .status-pending { background: rgba(255,193,7,0.2); color: #ffc107; }
+    .status-paid { background: rgba(0,212,255,0.2); color: #00d4ff; }
+    .status-processing { background: rgba(124,58,237,0.2); color: #7c3aed; }
+    .status-completed { background: rgba(20,241,149,0.2); color: #14f195; }
+    .status-failed { background: rgba(255,107,107,0.2); color: #ff6b6b; }
+    .new-task-btn {
+      background: linear-gradient(90deg, #00d4ff, #7c3aed);
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 25px;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .empty { color: #a0aec0; text-align: center; padding: 40px; }
+    .nav-links a {
+      display: inline-block;
+      margin-right: 20px;
+      padding: 8px 16px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      color: #00d4ff;
+      text-decoration: none;
+    }
+    .nav-links a:hover { background: rgba(255,255,255,0.1); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <a href="/" class="logo">WorkingDevsHero</a>
+      <nav>
+        <span style="color: #a0aec0;">${user.email}</span>
+        <a href="/auth/logout">Logout</a>
+      </nav>
+    </header>
+
+    <h1>Welcome back!</h1>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-number">${allTasks.length}</div>
+        <div class="stat-label">Total Tasks</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">${inProgress.length}</div>
+        <div class="stat-label">In Progress</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">${completed.length}</div>
+        <div class="stat-label">Completed</div>
+      </div>
+    </div>
+
+    <div class="nav-links">
+      <a href="/dashboard/in-progress">View In Progress</a>
+      <a href="/dashboard/completed">View Completed</a>
+      <a href="/#submit" class="new-task-btn">New Task</a>
+    </div>
+
+    <div class="section">
+      <h2>Recent Tasks</h2>
+      <div class="task-list">
+        ${allTasks.length === 0 ? '<div class="empty">No tasks yet. Submit your first task!</div>' : ''}
+        ${allTasks.slice(0, 5).map(task => `
+          <a href="${task.status === 'pending_payment' ? '/payment/' : '/status/'}${task.id}" class="task-card" style="text-decoration: none; color: inherit;">
+            <div class="task-info">
+              <h3>${task.task_description.substring(0, 60)}${task.task_description.length > 60 ? '...' : ''}</h3>
+              <p>${task.max_minutes} min • $${task.cost_usd.toFixed(2)} • ${new Date(task.created_at).toLocaleDateString()}</p>
+            </div>
+            <span class="task-status status-${task.status.replace('_', '-')}">${task.status.replace('_', ' ')}</span>
+          </a>
+        `).join('')}
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+  return c.html(html);
+});
+
+// In-progress tasks page
+app.get("/dashboard/in-progress", async (c) => {
+  const user = getCurrentUser(c);
+  if (!user) return c.redirect("/auth/login");
+
+  const tasks = getWorkItemsByUserIdAndStatus(user.id, ["paid", "processing"]);
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>In Progress - WorkingDevsHero</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      color: #fff;
+    }
+    .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+    header {
+      padding: 20px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      margin-bottom: 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo { font-size: 1.5rem; font-weight: 700; color: #00d4ff; }
+    nav a { color: #a0aec0; text-decoration: none; margin-left: 20px; }
+    nav a:hover { color: #00d4ff; }
+    h1 { margin-bottom: 10px; }
+    .subtitle { color: #a0aec0; margin-bottom: 30px; }
+    .task-list { display: flex; flex-direction: column; gap: 15px; }
+    .task-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 25px;
+    }
+    .task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .task-header h3 { font-size: 1.1rem; }
+    .task-status {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .status-paid { background: rgba(0,212,255,0.2); color: #00d4ff; }
+    .status-processing { background: rgba(124,58,237,0.2); color: #7c3aed; }
+    .task-description { color: #a0aec0; line-height: 1.6; margin-bottom: 15px; white-space: pre-wrap; }
+    .task-meta { display: flex; gap: 20px; color: #a0aec0; font-size: 0.9rem; }
+    .empty { color: #a0aec0; text-align: center; padding: 60px; }
+    .back-link { color: #00d4ff; text-decoration: none; display: inline-block; margin-bottom: 20px; }
+    .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #7c3aed; animation: spin 1s linear infinite; margin-right: 8px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <a href="/" class="logo">WorkingDevsHero</a>
+      <nav>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/auth/logout">Logout</a>
+      </nav>
+    </header>
+
+    <a href="/dashboard" class="back-link">← Back to Dashboard</a>
+    <h1>Tasks In Progress</h1>
+    <p class="subtitle">${tasks.length} task${tasks.length !== 1 ? 's' : ''} currently being processed</p>
+
+    <div class="task-list">
+      ${tasks.length === 0 ? '<div class="empty">No tasks currently in progress.</div>' : ''}
+      ${tasks.map(task => `
+        <div class="task-card">
+          <div class="task-header">
+            <h3>Task #${task.id}</h3>
+            <span class="task-status status-${task.status}">
+              ${task.status === 'processing' ? '<span class="spinner"></span>' : ''}
+              ${task.status === 'paid' ? 'In Queue' : 'Processing'}
+            </span>
+          </div>
+          <div class="task-description">${task.task_description.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+          <div class="task-meta">
+            <span>Time Budget: ${task.max_minutes} min</span>
+            <span>Cost: $${task.cost_usd.toFixed(2)}</span>
+            <span>Paid: ${task.paid_at ? new Date(task.paid_at).toLocaleString() : 'N/A'}</span>
+            ${task.started_at ? `<span>Started: ${new Date(task.started_at).toLocaleString()}</span>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  </div>
+  <script>
+    // Auto-refresh every 10 seconds
+    setTimeout(() => location.reload(), 10000);
+  </script>
+</body>
+</html>`;
+  return c.html(html);
+});
+
+// Completed tasks page
+app.get("/dashboard/completed", async (c) => {
+  const user = getCurrentUser(c);
+  if (!user) return c.redirect("/auth/login");
+
+  const tasks = getWorkItemsByUserIdAndStatus(user.id, ["completed", "failed"]);
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Completed Tasks - WorkingDevsHero</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      color: #fff;
+    }
+    .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+    header {
+      padding: 20px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      margin-bottom: 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo { font-size: 1.5rem; font-weight: 700; color: #00d4ff; }
+    nav a { color: #a0aec0; text-decoration: none; margin-left: 20px; }
+    nav a:hover { color: #00d4ff; }
+    h1 { margin-bottom: 10px; }
+    .subtitle { color: #a0aec0; margin-bottom: 30px; }
+    .task-list { display: flex; flex-direction: column; gap: 15px; }
+    .task-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 25px;
+    }
+    .task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .task-header h3 { font-size: 1.1rem; }
+    .task-status {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .status-completed { background: rgba(20,241,149,0.2); color: #14f195; }
+    .status-failed { background: rgba(255,107,107,0.2); color: #ff6b6b; }
+    .task-description { color: #a0aec0; line-height: 1.6; margin-bottom: 15px; }
+    .task-meta { display: flex; gap: 20px; color: #a0aec0; font-size: 0.9rem; margin-bottom: 15px; }
+    .task-result {
+      background: rgba(0,0,0,0.3);
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 15px;
+      font-family: monospace;
+      font-size: 0.9rem;
+      max-height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    .task-result.collapsed { max-height: 80px; }
+    .toggle-result { color: #00d4ff; background: none; border: none; cursor: pointer; font-size: 0.9rem; margin-top: 10px; }
+    .empty { color: #a0aec0; text-align: center; padding: 60px; }
+    .back-link { color: #00d4ff; text-decoration: none; display: inline-block; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <a href="/" class="logo">WorkingDevsHero</a>
+      <nav>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/auth/logout">Logout</a>
+      </nav>
+    </header>
+
+    <a href="/dashboard" class="back-link">← Back to Dashboard</a>
+    <h1>Completed Tasks</h1>
+    <p class="subtitle">${tasks.length} completed task${tasks.length !== 1 ? 's' : ''}</p>
+
+    <div class="task-list">
+      ${tasks.length === 0 ? '<div class="empty">No completed tasks yet.</div>' : ''}
+      ${tasks.map(task => {
+        let resultData = null;
+        try {
+          resultData = task.result ? JSON.parse(task.result) : null;
+        } catch (e) {}
+        return `
+        <div class="task-card">
+          <div class="task-header">
+            <h3>Task #${task.id}</h3>
+            <span class="task-status status-${task.status}">${task.status}</span>
+          </div>
+          <div class="task-description">${task.task_description.substring(0, 200).replace(/</g, '&lt;').replace(/>/g, '&gt;')}${task.task_description.length > 200 ? '...' : ''}</div>
+          <div class="task-meta">
+            <span>Time Budget: ${task.max_minutes} min</span>
+            <span>Cost: $${task.cost_usd.toFixed(2)}${task.cost_sol ? ' (' + task.cost_sol.toFixed(6) + ' SOL)' : ''}</span>
+            <span>Completed: ${task.completed_at ? new Date(task.completed_at).toLocaleString() : 'N/A'}</span>
+          </div>
+          ${resultData ? `
+          <div class="task-result collapsed" id="result-${task.id}">${(resultData.output || 'No output').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+          <button class="toggle-result" onclick="toggleResult(${task.id})">Show More</button>
+          ` : ''}
+        </div>
+      `}).join('')}
+    </div>
+  </div>
+  <script>
+    function toggleResult(id) {
+      const el = document.getElementById('result-' + id);
+      const btn = el.nextElementSibling;
+      if (el.classList.contains('collapsed')) {
+        el.classList.remove('collapsed');
+        btn.textContent = 'Show Less';
+      } else {
+        el.classList.add('collapsed');
+        btn.textContent = 'Show More';
+      }
+    }
+  </script>
+</body>
+</html>`;
   return c.html(html);
 });
 

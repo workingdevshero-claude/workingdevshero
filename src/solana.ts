@@ -11,7 +11,7 @@ export const PAYMENT_WALLET = "4ym27TW1CzsV42sFvbMwSMRwiWsEu5tHFkeYJYoqozcf";
 let cachedSolPrice: { price: number; timestamp: number } | null = null;
 const CACHE_DURATION_MS = 60000; // 1 minute cache
 
-// Get current SOL price in USD (simplified - in production, use a price oracle)
+// Get current SOL price in USD using Coinbase public API
 export async function getSolPrice(): Promise<number> {
   // Return cached price if still valid
   if (cachedSolPrice && Date.now() - cachedSolPrice.timestamp < CACHE_DURATION_MS) {
@@ -20,20 +20,23 @@ export async function getSolPrice(): Promise<number> {
 
   try {
     const response = await fetch(
-      "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
+      "https://api.exchange.coinbase.com/products/SOL-USD/ticker"
     );
     const data = await response.json();
 
-    if (data?.solana?.usd) {
-      cachedSolPrice = { price: data.solana.usd, timestamp: Date.now() };
-      return data.solana.usd;
+    if (data?.price) {
+      const price = parseFloat(data.price);
+      if (!isNaN(price) && price > 0) {
+        cachedSolPrice = { price, timestamp: Date.now() };
+        return price;
+      }
     }
 
     // API returned unexpected format
-    console.warn("Unexpected SOL price API response, using fallback");
+    console.warn("Unexpected Coinbase API response, using fallback");
     return cachedSolPrice?.price || 190; // Use cached or fallback
   } catch (error) {
-    console.error("Error fetching SOL price:", error);
+    console.error("Error fetching SOL price from Coinbase:", error);
     // Fallback price if API fails
     return cachedSolPrice?.price || 190;
   }
