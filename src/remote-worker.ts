@@ -1,4 +1,3 @@
-import { spawn } from "child_process";
 import nodemailer from "nodemailer";
 
 // Configuration from environment
@@ -62,81 +61,107 @@ function createTransporter() {
   });
 }
 
-// Execute Claude Code CLI with task
+// Execute Claude Code CLI with task using Bun.spawn
 async function executeClaudeCode(
   task: string,
   maxMinutes: number
 ): Promise<{ success: boolean; output: string; error?: string }> {
-  return new Promise((resolve) => {
-    const startTime = Date.now();
-    const maxTimeMs = maxMinutes * 60 * 1000;
+  const startTime = Date.now();
+  const maxTimeMs = maxMinutes * 60 * 1000;
 
-    // Build the prompt with time constraint
-    const prompt = `You have a maximum of ${maxMinutes} minutes to complete this task. Please use the system clock to track time and ensure you complete before the time limit. If you cannot finish, provide what you have accomplished so far.
+  const prompt = `You have a maximum of ${maxMinutes} minutes to complete this task. If you cannot finish, provide what you have accomplished so far.
 
 TASK:
 ${task}
 
 Please proceed with the task now.`;
 
-    console.log(`Starting Claude Code for task (max ${maxMinutes} min)...`);
+  console.log(`Starting Claude Code for task (max ${maxMinutes} min)...`);
 
-    const claudeProcess = spawn("claude", ["-p", prompt], {
-      cwd: "/tmp",
-      env: {
-        ...process.env,
-        HOME: process.env.HOME || "/home/claude",
-      },
-    });
-
-    let output = "";
-    let errorOutput = "";
-
-    claudeProcess.stdout.on("data", (data) => {
-      const text = data.toString();
-      output += text;
-      process.stdout.write(text);
-    });
-
-    claudeProcess.stderr.on("data", (data) => {
-      const text = data.toString();
-      errorOutput += text;
-      process.stderr.write(text);
-    });
-
-    // Set timeout
-    const timeout = setTimeout(() => {
-      console.log(`Task exceeded time limit (${maxMinutes} min), terminating...`);
-      claudeProcess.kill("SIGTERM");
-      setTimeout(() => {
-        if (!claudeProcess.killed) {
-          claudeProcess.kill("SIGKILL");
-        }
-      }, 5000);
-    }, maxTimeMs);
-
-    claudeProcess.on("close", (code) => {
-      clearTimeout(timeout);
-      const elapsed = (Date.now() - startTime) / 1000 / 60;
-      console.log(`Claude Code finished in ${elapsed.toFixed(2)} minutes with code ${code}`);
-
-      resolve({
-        success: code === 0,
-        output: output || "No output generated",
-        error: errorOutput || undefined,
-      });
-    });
-
-    claudeProcess.on("error", (err) => {
-      clearTimeout(timeout);
-      console.error("Failed to start Claude Code:", err);
-      resolve({
-        success: false,
-        output: "",
-        error: `Failed to start Claude Code: ${err.message}`,
-      });
-    });
+  const proc = Bun.spawn(["claude", "-p", prompt, "--output-format", "stream-json", "--verbose", "--no-session-persistence"], {
+    cwd: process.env.HOME || "/home/claude",
+    env: { ...process.env },
+    stdout: "pipe",
+    stderr: "pipe",
   });
+
+  console.log(`Claude process started with PID: ${proc.pid}`);
+
+  let finalResult = "";
+  let errorOutput = "";
+
+  // Set timeout to kill if exceeded
+  const timeoutId = setTimeout(() => {
+    console.log(`\nTask exceeded time limit (${maxMinutes} min), terminating...`);
+    proc.kill();
+  }, maxTimeMs);
+
+  // Process stdout
+  const reader = proc.stdout.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const json = JSON.parse(line);
+
+          if (json.type === 'system' && json.subtype === 'init') {
+            console.log(`🚀 Session: ${json.session_id?.substring(0, 8)}... Model: ${json.model}`);
+          }
+          else if (json.type === 'assistant' && json.message?.content) {
+            for (const block of json.message.content) {
+              if (block.type === 'text') {
+                console.log(`💬 ${block.text}`);
+                finalResult += block.text;
+              }
+              if (block.type === 'tool_use') {
+                console.log(`🔧 Tool: ${block.name}`);
+              }
+              if (block.type === 'thinking') {
+                console.log(`💭 ${block.thinking.substring(0, 200)}...`);
+              }
+            }
+          }
+          else if (json.type === 'result') {
+            console.log(`✅ Done! Cost: $${json.total_cost_usd?.toFixed(4)} Duration: ${(json.duration_ms / 1000).toFixed(1)}s`);
+            if (json.result) finalResult = json.result;
+          }
+        } catch {
+          console.log(line);
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Error reading stdout:", e);
+  }
+
+  // Process stderr
+  const stderrText = await new Response(proc.stderr).text();
+  if (stderrText.trim()) {
+    errorOutput = stderrText;
+    console.error("Stderr:", stderrText.substring(0, 200));
+  }
+
+  clearTimeout(timeoutId);
+  const exitCode = await proc.exited;
+  const elapsed = (Date.now() - startTime) / 1000 / 60;
+  console.log(`\nClaude finished in ${elapsed.toFixed(2)} minutes with code ${exitCode}`);
+
+  return {
+    success: exitCode === 0,
+    output: finalResult || "No output generated",
+    error: errorOutput || undefined,
+  };
 }
 
 // Send result email

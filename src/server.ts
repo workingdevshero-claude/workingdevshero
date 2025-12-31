@@ -968,6 +968,28 @@ app.post("/api/worker/complete/:id", async (c) => {
   return c.json({ success: true, message: "Task completed" });
 });
 
+// TEST ONLY: Mark a task as paid for testing
+app.post("/api/test/mark-paid/:id", async (c) => {
+  const authHeader = c.req.header("Authorization");
+  if (!verifyWorkerAuth(authHeader)) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const id = parseInt(c.req.param("id"));
+  const workItem = getWorkItemById(id);
+
+  if (!workItem) {
+    return c.json({ error: "Task not found" }, 404);
+  }
+
+  if (workItem.status !== "pending_payment") {
+    return c.json({ error: "Task is not pending_payment" }, 400);
+  }
+
+  updateWorkItemPayment(id, "TEST-" + Date.now(), 0.001);
+  return c.json({ success: true, message: "Task marked as paid for testing" });
+});
+
 // Get task details (for worker to fetch email info after claiming)
 app.get("/api/worker/task/:id", async (c) => {
   const authHeader = c.req.header("Authorization");
