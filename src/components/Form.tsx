@@ -119,6 +119,7 @@ export const buttonStyles = `
   .btn-primary:hover {
     background: var(--accent-gradient-hover);
     box-shadow: var(--shadow-lg), 0 0 30px rgba(59, 130, 246, 0.2);
+    color: white;
   }
 
   .btn-secondary {
@@ -172,6 +173,7 @@ export const buttonStyles = `
     transform: translateY(-3px);
     box-shadow: var(--shadow-xl), 0 0 40px rgba(59, 130, 246, 0.3);
     text-decoration: none;
+    color: white;
   }
 
   .cta-button:active {
