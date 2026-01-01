@@ -178,8 +178,10 @@ app.get("/auth/logout", async (c) => {
   if (sessionId) {
     await logoutUser(sessionId);
   }
-  return c.redirect("/", {
+  return new Response(null, {
+    status: 302,
     headers: {
+      "Location": "/",
       "Set-Cookie": createLogoutCookie(),
     },
   });
