@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
-import { createWorkItem, getWorkItemById, getPaidItems, updateWorkItemStatus, updateWorkItemPayment, getWorkItemsByUserId, getWorkItemsByUserIdAndStatus, isTransactionUsed, type User } from "./db";
+import { createWorkItem, getWorkItemById, getPaidItems, updateWorkItemStatus, updateWorkItemPayment, getWorkItemsByUserId, getWorkItemsByUserIdAndStatus, isTransactionUsed, deleteWorkItem, type User } from "./db";
 import { PAYMENT_WALLET, getSolPrice, usdToSol, getUniquePaymentAmount, checkForPayment, getWalletBalance } from "./solana";
 import { registerUser, loginUser, logoutUser, validateSession, getSessionFromCookie, createSessionCookie, createLogoutCookie } from "./auth";
 
@@ -654,6 +654,28 @@ app.get("/payment/:id", async (c) => {
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    .cancel-button {
+      width: 100%;
+      background: transparent;
+      color: #e53e3e;
+      padding: 12px;
+      border: 1px solid #e53e3e;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      margin-top: 15px;
+      transition: all 0.2s;
+    }
+
+    .cancel-button:hover {
+      background: rgba(229, 62, 62, 0.1);
+    }
+
+    .cancel-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -683,6 +705,7 @@ app.get("/payment/:id", async (c) => {
         <h3>Or send to this address:</h3>
         <div class="address" id="address">${PAYMENT_WALLET}</div>
         <button class="copy-button" onclick="copyAddress()">Copy Address</button>
+        <button class="cancel-button" onclick="cancelTask()">Cancel Task</button>
       </div>
 
       <div id="checking">
@@ -714,6 +737,33 @@ app.get("/payment/:id", async (c) => {
       const button = document.querySelector('.copy-button');
       button.textContent = 'Copied!';
       setTimeout(() => button.textContent = 'Copy Address', 2000);
+    }
+
+    async function cancelTask() {
+      if (!confirm('Are you sure you want to cancel this task?')) {
+        return;
+      }
+      const button = document.querySelector('.cancel-button');
+      button.disabled = true;
+      button.textContent = 'Cancelling...';
+      try {
+        const response = await fetch('/api/task/${workItem.id}', {
+          method: 'DELETE',
+        });
+        const data = await response.json();
+        if (data.success) {
+          alert('Task cancelled successfully');
+          window.location.href = '/dashboard';
+        } else {
+          alert('Failed to cancel task: ' + (data.error || 'Unknown error'));
+          button.disabled = false;
+          button.textContent = 'Cancel Task';
+        }
+      } catch (error) {
+        alert('Error cancelling task');
+        button.disabled = false;
+        button.textContent = 'Cancel Task';
+      }
     }
 
     ${workItem.status !== 'paid' ? `
@@ -776,6 +826,38 @@ app.get("/api/check-payment/:id", async (c) => {
   }
 
   return c.json({ paid: false });
+});
+
+// API endpoint to delete a pending payment task
+app.delete("/api/task/:id", async (c) => {
+  const user = getCurrentUser(c);
+  if (!user) {
+    return c.json({ success: false, error: "Authentication required" }, 401);
+  }
+
+  const id = parseInt(c.req.param("id"));
+  const workItem = getWorkItemById(id);
+
+  if (!workItem) {
+    return c.json({ success: false, error: "Task not found" }, 404);
+  }
+
+  // Only allow owner to delete their task
+  if (workItem.user_id !== user.id) {
+    return c.json({ success: false, error: "Not authorized" }, 403);
+  }
+
+  // Only allow deletion of pending_payment tasks
+  if (workItem.status !== "pending_payment") {
+    return c.json({ success: false, error: "Can only delete tasks pending payment" }, 400);
+  }
+
+  const deleted = deleteWorkItem(id);
+  if (deleted) {
+    return c.json({ success: true });
+  } else {
+    return c.json({ success: false, error: "Failed to delete task" }, 500);
+  }
 });
 
 // API endpoint to get queue status

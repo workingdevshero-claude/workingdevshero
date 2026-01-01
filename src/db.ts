@@ -219,3 +219,9 @@ export function isTransactionUsed(signature: string): boolean {
 export function getPendingPaymentItemsAfter(afterTime: string): WorkItem[] {
   return db.prepare("SELECT * FROM work_items WHERE status = 'pending_payment' AND created_at >= ?").all(afterTime) as WorkItem[];
 }
+
+// Delete a work item (only if pending_payment)
+export function deleteWorkItem(id: number): boolean {
+  const result = db.prepare("DELETE FROM work_items WHERE id = ? AND status = 'pending_payment'").run(id);
+  return result.changes > 0;
+}
