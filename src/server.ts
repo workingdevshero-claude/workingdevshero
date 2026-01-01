@@ -611,6 +611,67 @@ app.get("/submit", async (c) => {
       border-color: rgba(0, 212, 255, 0.3);
       color: #00d4ff;
     }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      background: #1a1a2e;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 15px;
+      padding: 30px;
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+    }
+
+    .modal h3 {
+      margin-bottom: 15px;
+      color: #fff;
+    }
+
+    .modal p {
+      color: #a0aec0;
+      margin-bottom: 25px;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .modal-btn {
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.2s;
+    }
+
+    .modal-btn:hover {
+      opacity: 0.9;
+    }
+
+    .modal-btn-primary {
+      background: linear-gradient(90deg, #00d4ff, #7c3aed);
+      color: white;
+    }
   </style>
 </head>
 <body>
@@ -859,6 +920,35 @@ SOCIAL MEDIA:
 
     minutesSelect.addEventListener('change', updateCost);
 
+    // Modal functions
+    function showModal(title, message, buttons) {
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-message').textContent = message;
+      const buttonsContainer = document.getElementById('modal-buttons');
+      buttonsContainer.innerHTML = '';
+      buttons.forEach(btn => {
+        const button = document.createElement('button');
+        button.className = 'modal-btn ' + (btn.class || 'modal-btn-primary');
+        button.textContent = btn.text;
+        button.onclick = () => {
+          hideModal();
+          if (btn.action) btn.action();
+        };
+        buttonsContainer.appendChild(button);
+      });
+      document.getElementById('modal').classList.add('active');
+    }
+
+    function hideModal() {
+      document.getElementById('modal').classList.remove('active');
+    }
+
+    function showAlert(title, message, onClose) {
+      showModal(title, message, [
+        { text: 'OK', class: 'modal-btn-primary', action: onClose }
+      ]);
+    }
+
     document.getElementById('taskForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const form = e.target;
@@ -882,17 +972,26 @@ SOCIAL MEDIA:
         } else if (data.requiresAuth) {
           window.location.href = '/auth/login';
         } else {
-          alert('Error: ' + data.error);
+          showAlert('Error', data.error || 'Failed to submit task');
           button.disabled = false;
           button.textContent = 'Submit Task & Pay with Solana';
         }
       } catch (error) {
-        alert('Error submitting task. Please try again.');
+        showAlert('Error', 'Error submitting task. Please try again.');
         button.disabled = false;
         button.textContent = 'Submit Task & Pay with Solana';
       }
     });
   </script>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <h3 id="modal-title">Error</h3>
+      <p id="modal-message">Something went wrong</p>
+      <div class="modal-buttons" id="modal-buttons"></div>
+    </div>
+  </div>
 </body>
 </html>`;
 
@@ -1151,6 +1250,77 @@ app.get("/payment/:id", async (c) => {
       opacity: 0.5;
       cursor: not-allowed;
     }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      background: #1a1a2e;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 15px;
+      padding: 30px;
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+    }
+
+    .modal h3 {
+      margin-bottom: 15px;
+      color: #fff;
+    }
+
+    .modal p {
+      color: #a0aec0;
+      margin-bottom: 25px;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .modal-btn {
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.2s;
+    }
+
+    .modal-btn:hover {
+      opacity: 0.9;
+    }
+
+    .modal-btn-primary {
+      background: linear-gradient(90deg, #00d4ff, #7c3aed);
+      color: white;
+    }
+
+    .modal-btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: #a0aec0;
+    }
+
+    .modal-btn-danger {
+      background: #e53e3e;
+      color: white;
+    }
   </style>
 </head>
 <body>
@@ -1202,11 +1372,56 @@ app.get("/payment/:id", async (c) => {
         <p>${workItem.task_description.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
       </div>
 
-      <a href="/" class="back-link">← Back to Home</a>
+      <a href="/dashboard" class="back-link">← Back to Dashboard</a>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <h3 id="modal-title">Confirm</h3>
+      <p id="modal-message">Are you sure?</p>
+      <div class="modal-buttons" id="modal-buttons"></div>
     </div>
   </div>
 
   <script>
+    // Modal functions
+    function showModal(title, message, buttons) {
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-message').textContent = message;
+      const buttonsContainer = document.getElementById('modal-buttons');
+      buttonsContainer.innerHTML = '';
+      buttons.forEach(btn => {
+        const button = document.createElement('button');
+        button.className = 'modal-btn ' + (btn.class || 'modal-btn-primary');
+        button.textContent = btn.text;
+        button.onclick = () => {
+          hideModal();
+          if (btn.action) btn.action();
+        };
+        buttonsContainer.appendChild(button);
+      });
+      document.getElementById('modal').classList.add('active');
+    }
+
+    function hideModal() {
+      document.getElementById('modal').classList.remove('active');
+    }
+
+    function showAlert(title, message, onClose) {
+      showModal(title, message, [
+        { text: 'OK', class: 'modal-btn-primary', action: onClose }
+      ]);
+    }
+
+    function showConfirm(title, message, onConfirm, onCancel) {
+      showModal(title, message, [
+        { text: 'Cancel', class: 'modal-btn-secondary', action: onCancel },
+        { text: 'Confirm', class: 'modal-btn-danger', action: onConfirm }
+      ]);
+    }
+
     function copyAddress() {
       navigator.clipboard.writeText('${PAYMENT_WALLET}');
       const button = document.querySelector('.copy-button');
@@ -1215,30 +1430,34 @@ app.get("/payment/:id", async (c) => {
     }
 
     async function cancelTask() {
-      if (!confirm('Are you sure you want to cancel this task?')) {
-        return;
-      }
-      const button = document.querySelector('.cancel-button');
-      button.disabled = true;
-      button.textContent = 'Cancelling...';
-      try {
-        const response = await fetch('/api/task/${workItem.id}', {
-          method: 'DELETE',
-        });
-        const data = await response.json();
-        if (data.success) {
-          alert('Task cancelled successfully');
-          window.location.href = '/dashboard';
-        } else {
-          alert('Failed to cancel task: ' + (data.error || 'Unknown error'));
-          button.disabled = false;
-          button.textContent = 'Cancel Task';
+      showConfirm(
+        'Cancel Task',
+        'Are you sure you want to cancel this task? This action cannot be undone.',
+        async () => {
+          const button = document.querySelector('.cancel-button');
+          button.disabled = true;
+          button.textContent = 'Cancelling...';
+          try {
+            const response = await fetch('/api/task/${workItem.id}', {
+              method: 'DELETE',
+            });
+            const data = await response.json();
+            if (data.success) {
+              showAlert('Success', 'Task cancelled successfully', () => {
+                window.location.href = '/dashboard';
+              });
+            } else {
+              showAlert('Error', 'Failed to cancel task: ' + (data.error || 'Unknown error'));
+              button.disabled = false;
+              button.textContent = 'Cancel Task';
+            }
+          } catch (error) {
+            showAlert('Error', 'Error cancelling task. Please try again.');
+            button.disabled = false;
+            button.textContent = 'Cancel Task';
+          }
         }
-      } catch (error) {
-        alert('Error cancelling task');
-        button.disabled = false;
-        button.textContent = 'Cancel Task';
-      }
+      );
     }
 
     ${workItem.status !== 'paid' ? `
@@ -1502,7 +1721,7 @@ app.get("/status/:id", async (c) => {
 
       ${workItem.status === "pending_payment" ? '<p style="text-align:center;margin-top:20px;"><a href="/payment/' + workItem.id + '" style="color:#00d4ff;">View Payment Details</a></p>' : ""}
 
-      <a href="/" class="back-link">← Back to Home</a>
+      <a href="/dashboard" class="back-link">← Back to Dashboard</a>
     </div>
   </div>
   ${shouldRefresh ? `
