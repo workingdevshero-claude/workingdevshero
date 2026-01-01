@@ -4,8 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun --hot src/server.ts",
-    "start": "bun src/server.ts",
+    "dev": "bun --hot src/server.tsx",
+    "start": "bun src/server.tsx",
     "worker": "bun src/worker.ts",
     "remote-worker": "bun src/remote-worker.ts",
     "generate-wallet": "bun generate-wallet.ts"
