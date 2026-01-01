@@ -670,11 +670,12 @@ app.get("/submit", async (c) => {
       <div class="examples">
         <h3>Example Tasks</h3>
         <div class="example-chips">
-          <span class="example-chip" onclick="setExample('python')">Python data analysis script</span>
-          <span class="example-chip" onclick="setExample('website')">Landing page with HTML/CSS</span>
-          <span class="example-chip" onclick="setExample('api')">REST API with authentication</span>
-          <span class="example-chip" onclick="setExample('blog')">SEO blog post draft</span>
-          <span class="example-chip" onclick="setExample('automation')">Shell automation script</span>
+          <span class="example-chip" onclick="setExample('portfolio')">Stock Portfolio Analysis</span>
+          <span class="example-chip" onclick="setExample('businessplan')">AI Startup Business Plan</span>
+          <span class="example-chip" onclick="setExample('webapp')">Full-Stack Web Application</span>
+          <span class="example-chip" onclick="setExample('research')">Market Research Report</span>
+          <span class="example-chip" onclick="setExample('contentcalendar')">Content Marketing Strategy</span>
+          <span class="example-chip" onclick="setExample('automation')">Enterprise Automation Suite</span>
         </div>
       </div>
     </div>
@@ -682,11 +683,195 @@ app.get("/submit", async (c) => {
 
   <script>
     const examples = {
-      python: "Create a Python script that reads a CSV file, performs basic data analysis (mean, median, standard deviation for numeric columns), and generates a summary report as a markdown file.",
-      website: "Build a responsive landing page for a SaaS product. Include a hero section, features grid, pricing table, and contact form. Use modern CSS with a dark theme.",
-      api: "Create a REST API using Node.js/Express with user registration, login with JWT tokens, and CRUD operations for a 'notes' resource. Include input validation.",
-      blog: "Write a 1500-word blog post about the benefits of AI in software development. Include an introduction, 5 main points with examples, and a conclusion. Optimize for SEO.",
-      automation: "Create a bash script that backs up specified directories to a timestamped archive, cleans up backups older than 30 days, and logs all operations."
+      portfolio: \`Create a comprehensive stock portfolio analysis tool and report:
+
+1. Generate a sample CSV file with 15-20 stocks including: ticker symbol, purchase date, purchase price, current price, shares owned, sector, and dividend yield
+
+2. Build a Python analysis script that:
+   - Calculates total portfolio value, cost basis, and overall return
+   - Computes individual stock performance (gain/loss %, annualized return)
+   - Analyzes sector allocation and diversification metrics
+   - Identifies top and bottom performers
+   - Calculates portfolio beta and volatility estimates
+   - Generates dividend income projections
+
+3. Create a detailed markdown report with:
+   - Executive summary with key metrics
+   - Portfolio composition charts (describe in text/ASCII)
+   - Risk analysis and diversification score
+   - Specific rebalancing recommendations
+   - Tax-loss harvesting opportunities
+   - 5 actionable recommendations to optimize the portfolio\`,
+
+      businessplan: \`Create a comprehensive market analysis and business plan for an AI-powered software development platform (similar to this service). Include:
+
+MARKET ANALYSIS:
+- Total addressable market (TAM) sizing with methodology
+- Serviceable addressable market (SAM) breakdown
+- Competitor analysis: identify 10+ competitors, their pricing, features, strengths/weaknesses
+- Market trends and growth projections for AI development tools
+- Customer segmentation and persona development
+
+BUSINESS MODEL:
+- Detailed pricing strategy with unit economics
+- Customer acquisition cost (CAC) estimates by channel
+- Lifetime value (LTV) projections
+- Revenue model and 3-year financial projections
+- Break-even analysis
+
+GO-TO-MARKET STRATEGY:
+- Launch phases and milestones
+- Marketing channel priorities with budget allocation
+- Partnership opportunities
+- Content marketing and SEO strategy
+
+TECHNICAL ROADMAP:
+- MVP features vs. future releases
+- Infrastructure cost projections
+- Scaling considerations
+
+RISK ANALYSIS:
+- Key risks and mitigation strategies
+- Competitive moat analysis
+
+Format as a professional business plan document with executive summary.\`,
+
+      webapp: \`Build a complete full-stack task management web application with the following requirements:
+
+BACKEND (Node.js/Express or Python/FastAPI):
+- RESTful API with full CRUD operations
+- User authentication with JWT tokens and refresh token rotation
+- Password hashing with bcrypt
+- Role-based access control (admin, manager, user)
+- SQLite database with proper schema design
+- Input validation and sanitization
+- Rate limiting middleware
+- Comprehensive error handling
+
+FRONTEND (React or vanilla JS):
+- Responsive dashboard with task boards (Kanban style)
+- User registration and login forms
+- Task creation with title, description, priority, due date, assignee
+- Drag-and-drop task status updates
+- Filter and search functionality
+- User profile management
+- Dark/light theme toggle
+
+FEATURES:
+- Task comments and activity log
+- Email notifications (mock/console output)
+- Task labels and categories
+- Due date reminders
+- Export tasks to CSV
+
+Include setup instructions, environment configuration, and sample data.\`,
+
+      research: \`Conduct comprehensive market research on the AI coding assistant industry and produce a detailed report:
+
+INDUSTRY OVERVIEW:
+- Define the market and key segments
+- Historical growth and current market size
+- Key players and market share estimates
+- Technology stack analysis (LLMs, IDEs, deployment)
+
+COMPETITIVE LANDSCAPE:
+- Detailed profiles of top 10 competitors (GitHub Copilot, Cursor, Codeium, Tabnine, Amazon CodeWhisperer, etc.)
+- Feature comparison matrix
+- Pricing comparison table
+- User review sentiment analysis
+- SWOT analysis for each major player
+
+TRENDS & INSIGHTS:
+- Emerging technologies and capabilities
+- Enterprise vs. individual adoption patterns
+- Integration trends (IDE plugins, CLI tools, web apps)
+- Open source vs. proprietary models
+- Privacy and security considerations
+
+FUTURE OUTLOOK:
+- 5-year growth projections with methodology
+- Potential disruptions and wildcards
+- Consolidation predictions
+- Regulatory considerations
+
+RECOMMENDATIONS:
+- Market entry opportunities
+- Underserved segments
+- Differentiation strategies
+
+Format with executive summary, detailed sections, data tables, and citations.\`,
+
+      contentcalendar: \`Develop a comprehensive 3-month content marketing strategy and calendar for a B2B SaaS company selling AI development tools. Include:
+
+CONTENT STRATEGY:
+- Target audience analysis with 3 detailed buyer personas
+- Content pillars and themes aligned with buyer journey
+- SEO keyword research (provide 50+ target keywords with search intent)
+- Competitor content gap analysis
+- Content distribution channel strategy
+
+CONTENT CALENDAR (12 weeks):
+For each week, specify:
+- 2 blog posts (titles, outlines, target keywords, word count)
+- 5 social media posts per platform (LinkedIn, Twitter/X, specific copy)
+- 1 email newsletter topic and outline
+- Any additional content (case studies, whitepapers, webinars)
+
+BLOG POSTS (write 3 complete posts):
+1. Thought leadership piece (2000+ words)
+2. How-to tutorial with code examples (1500+ words)
+3. Industry trends analysis (1500+ words)
+
+SOCIAL MEDIA TEMPLATES:
+- 10 LinkedIn post templates
+- 15 Twitter/X thread starters
+- 5 engagement post formats
+
+MEASUREMENT:
+- KPIs and success metrics
+- Reporting template
+- A/B testing recommendations
+
+Deliver as a structured document with the calendar in a table format.\`,
+
+      automation: \`Create a comprehensive enterprise automation suite with multiple integrated scripts:
+
+1. INFRASTRUCTURE MONITORING SYSTEM:
+- Server health check script (CPU, memory, disk, network)
+- Service availability monitoring (HTTP endpoints, database connections)
+- Log aggregation and error detection
+- Alert system with configurable thresholds
+- Daily/weekly summary report generation
+
+2. BACKUP AND DISASTER RECOVERY:
+- Incremental backup system for databases and files
+- Rotation policy (daily/weekly/monthly retention)
+- Backup verification and integrity checks
+- Restore procedure scripts with testing
+- Off-site sync simulation
+
+3. DEPLOYMENT AUTOMATION:
+- Git-based deployment pipeline script
+- Environment configuration management
+- Database migration runner
+- Rollback capabilities
+- Deployment notification system
+
+4. SECURITY AUTOMATION:
+- SSL certificate expiration checker
+- Failed login attempt monitor
+- Firewall rule auditor
+- Dependency vulnerability scanner
+- Security report generator
+
+5. DOCUMENTATION:
+- Complete README with setup instructions
+- Configuration file templates
+- Cron job scheduling guide
+- Troubleshooting runbook
+- Architecture diagram (ASCII)
+
+All scripts should be production-ready with proper error handling, logging, and configuration files.\`
     };
 
     function setExample(type) {
