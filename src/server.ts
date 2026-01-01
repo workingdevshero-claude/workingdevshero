@@ -287,7 +287,7 @@ app.get("/", async (c) => {
     <div class="container">
       <h1>AI Application Development as a Service</h1>
       <p>Let Claude Code build your software. Pay only for the time you need. Fast, reliable, and powered by cutting-edge AI.</p>
-      <a href="#submit" class="cta-button">Get Started</a>
+      <a href="${user ? '/submit' : '/auth/register'}" class="cta-button">${user ? 'Submit a Task' : 'Get Started Free'}</a>
       <div class="solana-badge">
         <svg width="20" height="20" viewBox="0 0 397 311" fill="currentColor">
           <path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z"/>
@@ -314,48 +314,69 @@ app.get("/", async (c) => {
     </div>
   </section>
 
+  <section style="padding: 60px 20px;">
+    <div class="container">
+      <h2 style="text-align: center; font-size: 2.5rem; margin-bottom: 50px;">What Can You Build?</h2>
+      <div class="features" style="padding: 0;">
+        <div class="feature-card">
+          <h3>Reports & Analysis</h3>
+          <p>Data analysis scripts, financial reports, market research summaries, competitor analysis, and automated reporting tools.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Content Creation</h3>
+          <p>Blog posts, social media content, marketing copy, newsletter templates, SEO-optimized articles, and content calendars.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Websites & Landing Pages</h3>
+          <p>Responsive websites, landing pages, portfolios, documentation sites, and single-page applications with modern frameworks.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Scripts & Automation</h3>
+          <p>Python scripts, shell automation, data processing pipelines, API integrations, web scrapers, and scheduled tasks.</p>
+        </div>
+        <div class="feature-card">
+          <h3>APIs & Backends</h3>
+          <p>REST APIs, GraphQL servers, database schemas, authentication systems, and microservices architecture.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Tools & Utilities</h3>
+          <p>CLI tools, browser extensions, VS Code extensions, Discord bots, Slack integrations, and custom developer tools.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="pricing">
     <div class="container">
       <h2>Simple, Transparent Pricing</h2>
       <div class="price-tag">$6 <span>/ hour</span></div>
       <p style="color: #a0aec0; margin-bottom: 10px;">That's just $0.10 per minute of AI development time</p>
-      <p style="color: #a0aec0;">Pay with Solana - fast, low fees, instant confirmation!</p>
+      <p style="color: #a0aec0; margin-bottom: 30px;">Pay with Solana - fast, low fees, instant confirmation!</p>
+      <a href="${user ? '/submit' : '/auth/register'}" class="cta-button">${user ? 'Submit a Task' : 'Get Started Free'}</a>
     </div>
   </section>
 
-  <section class="form-section" id="submit">
-    <h2>Submit Your Task</h2>
-    ${user ? `
-    <form id="taskForm">
-      <div class="form-group">
-        <label>Results will be sent to</label>
-        <div style="padding: 15px; background: rgba(255,255,255,0.05); border-radius: 10px; color: #00d4ff;">${user.email}</div>
+  <section style="padding: 60px 20px; text-align: center;">
+    <div class="container">
+      <h2 style="font-size: 2rem; margin-bottom: 20px;">How It Works</h2>
+      <div style="display: flex; justify-content: center; gap: 40px; flex-wrap: wrap; margin-top: 40px;">
+        <div style="max-width: 200px;">
+          <div style="font-size: 3rem; color: #00d4ff; margin-bottom: 15px;">1</div>
+          <h4 style="margin-bottom: 10px;">Describe Your Task</h4>
+          <p style="color: #a0aec0;">Tell us what you want built in plain English. Be as detailed as you like.</p>
+        </div>
+        <div style="max-width: 200px;">
+          <div style="font-size: 3rem; color: #00d4ff; margin-bottom: 15px;">2</div>
+          <h4 style="margin-bottom: 10px;">Set Your Budget</h4>
+          <p style="color: #a0aec0;">Choose how many minutes of AI time you want. Pay with Solana.</p>
+        </div>
+        <div style="max-width: 200px;">
+          <div style="font-size: 3rem; color: #00d4ff; margin-bottom: 15px;">3</div>
+          <h4 style="margin-bottom: 10px;">Get Results</h4>
+          <p style="color: #a0aec0;">Receive your completed work via email. Review, iterate, done.</p>
+        </div>
       </div>
-
-      <div class="form-group">
-        <label for="minutes">Maximum Minutes (1-120)</label>
-        <input type="number" id="minutes" name="minutes" min="1" max="120" value="10" required>
-      </div>
-
-      <div class="form-group">
-        <label for="task">Task Description</label>
-        <textarea id="task" name="task" required placeholder="Describe what you want built. Be as specific as possible..."></textarea>
-      </div>
-
-      <div class="cost-preview">
-        <p>Estimated Cost</p>
-        <div class="amount">$<span id="costUsd">1.00</span></div>
-      </div>
-
-      <button type="submit" class="submit-button">Submit Task</button>
-    </form>
-    ` : `
-    <div style="text-align: center; padding: 40px;">
-      <p style="color: #a0aec0; margin-bottom: 20px;">Please log in or create an account to submit tasks.</p>
-      <a href="/auth/login" class="cta-button" style="margin-right: 10px;">Login</a>
-      <a href="/auth/register" class="cta-button">Sign Up</a>
     </div>
-    `}
   </section>
 
   <footer>
@@ -364,59 +385,358 @@ app.get("/", async (c) => {
     </div>
   </footer>
 
-  <script>
-    const ratePerMinute = 0.10;
+</body>
+</html>`;
 
-    const minutesInput = document.getElementById('minutes');
+  return c.html(html);
+});
+
+// Submit task page (requires authentication)
+app.get("/submit", async (c) => {
+  const user = getCurrentUser(c);
+
+  if (!user) {
+    return c.redirect("/auth/login");
+  }
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Submit Task - WorkingDevsHero</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      color: #fff;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    header {
+      padding: 20px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      margin-bottom: 40px;
+    }
+
+    .header-content {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #00d4ff;
+      text-decoration: none;
+    }
+
+    nav a {
+      color: #00d4ff;
+      text-decoration: none;
+      margin-left: 15px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      background: linear-gradient(90deg, #00d4ff, #7c3aed);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #a0aec0;
+      margin-bottom: 40px;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 40px;
+    }
+
+    .form-group {
+      margin-bottom: 25px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #a0aec0;
+      font-weight: 500;
+    }
+
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+      width: 100%;
+      padding: 15px;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.05);
+      color: white;
+      font-size: 1rem;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #00d4ff;
+    }
+
+    .form-group textarea {
+      min-height: 200px;
+      resize: vertical;
+      font-family: inherit;
+    }
+
+    .form-group small {
+      display: block;
+      margin-top: 8px;
+      color: #718096;
+    }
+
+    .email-display {
+      padding: 15px;
+      background: rgba(0, 212, 255, 0.1);
+      border-radius: 10px;
+      color: #00d4ff;
+      border: 1px solid rgba(0, 212, 255, 0.2);
+    }
+
+    .cost-preview {
+      background: rgba(20, 241, 149, 0.1);
+      padding: 25px;
+      border-radius: 15px;
+      margin: 30px 0;
+      text-align: center;
+      border: 1px solid rgba(20, 241, 149, 0.2);
+    }
+
+    .cost-preview p {
+      color: #a0aec0;
+      margin-bottom: 10px;
+    }
+
+    .cost-preview .amount {
+      font-size: 2.5rem;
+      color: #14f195;
+      font-weight: 700;
+    }
+
+    .cost-preview .rate {
+      color: #718096;
+      font-size: 0.9rem;
+      margin-top: 10px;
+    }
+
+    .submit-button {
+      width: 100%;
+      background: linear-gradient(90deg, #00d4ff, #7c3aed);
+      color: white;
+      padding: 18px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.2s;
+    }
+
+    .submit-button:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .submit-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .examples {
+      margin-top: 40px;
+      padding-top: 30px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .examples h3 {
+      color: #a0aec0;
+      margin-bottom: 15px;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .example-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .example-chip {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      color: #a0aec0;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .example-chip:hover {
+      background: rgba(0, 212, 255, 0.1);
+      border-color: rgba(0, 212, 255, 0.3);
+      color: #00d4ff;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <a href="/" class="logo">WorkingDevsHero</a>
+      <nav>
+        <a href="/dashboard">Dashboard</a>
+        <span style="color: #a0aec0; margin-left: 15px;">${user.email}</span>
+      </nav>
+    </div>
+  </header>
+
+  <div class="container">
+    <h1>Submit a Task</h1>
+    <p class="subtitle">Describe what you want built and let AI do the work</p>
+
+    <div class="card">
+      <form id="taskForm">
+        <div class="form-group">
+          <label>Results will be sent to</label>
+          <div class="email-display">${user.email}</div>
+        </div>
+
+        <div class="form-group">
+          <label for="minutes">Time Budget</label>
+          <select id="minutes" name="minutes">
+            <option value="5">5 minutes - $0.50</option>
+            <option value="10" selected>10 minutes - $1.00</option>
+            <option value="15">15 minutes - $1.50</option>
+            <option value="30">30 minutes - $3.00</option>
+            <option value="60">60 minutes - $6.00</option>
+            <option value="120">120 minutes - $12.00</option>
+          </select>
+          <small>Choose how much AI development time to allocate. Complex tasks need more time.</small>
+        </div>
+
+        <div class="form-group">
+          <label for="task">Task Description</label>
+          <textarea id="task" name="task" required placeholder="Be specific about what you want built. Include:
+- The type of output (script, website, report, etc.)
+- Technologies or languages to use (if any preference)
+- Any specific requirements or constraints
+- Examples or references if helpful"></textarea>
+          <small>The more detail you provide, the better the results.</small>
+        </div>
+
+        <div class="cost-preview">
+          <p>Total Cost</p>
+          <div class="amount">$<span id="costUsd">1.00</span></div>
+          <div class="rate">$0.10 per minute of AI development time</div>
+        </div>
+
+        <button type="submit" class="submit-button">Submit Task & Pay with Solana</button>
+      </form>
+
+      <div class="examples">
+        <h3>Example Tasks</h3>
+        <div class="example-chips">
+          <span class="example-chip" onclick="setExample('python')">Python data analysis script</span>
+          <span class="example-chip" onclick="setExample('website')">Landing page with HTML/CSS</span>
+          <span class="example-chip" onclick="setExample('api')">REST API with authentication</span>
+          <span class="example-chip" onclick="setExample('blog')">SEO blog post draft</span>
+          <span class="example-chip" onclick="setExample('automation')">Shell automation script</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const examples = {
+      python: "Create a Python script that reads a CSV file, performs basic data analysis (mean, median, standard deviation for numeric columns), and generates a summary report as a markdown file.",
+      website: "Build a responsive landing page for a SaaS product. Include a hero section, features grid, pricing table, and contact form. Use modern CSS with a dark theme.",
+      api: "Create a REST API using Node.js/Express with user registration, login with JWT tokens, and CRUD operations for a 'notes' resource. Include input validation.",
+      blog: "Write a 1500-word blog post about the benefits of AI in software development. Include an introduction, 5 main points with examples, and a conclusion. Optimize for SEO.",
+      automation: "Create a bash script that backs up specified directories to a timestamped archive, cleans up backups older than 30 days, and logs all operations."
+    };
+
+    function setExample(type) {
+      document.getElementById('task').value = examples[type];
+    }
+
+    const minutesSelect = document.getElementById('minutes');
     const costUsdSpan = document.getElementById('costUsd');
 
     function updateCost() {
-      if (!minutesInput) return;
-      const minutes = parseInt(minutesInput.value) || 1;
-      const costUsd = (minutes * ratePerMinute).toFixed(2);
+      const minutes = parseInt(minutesSelect.value) || 10;
+      const costUsd = (minutes * 0.10).toFixed(2);
       costUsdSpan.textContent = costUsd;
     }
 
-    if (minutesInput) {
-      minutesInput.addEventListener('input', updateCost);
-    }
+    minutesSelect.addEventListener('change', updateCost);
 
-    const taskForm = document.getElementById('taskForm');
-    if (taskForm) {
-      taskForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const form = e.target;
-        const button = form.querySelector('button');
-        button.disabled = true;
-        button.textContent = 'Submitting...';
+    document.getElementById('taskForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const button = form.querySelector('button');
+      button.disabled = true;
+      button.textContent = 'Submitting...';
 
-        try {
-          const response = await fetch('/api/submit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              minutes: parseInt(form.minutes.value),
-              task: form.task.value
-            })
-          });
+      try {
+        const response = await fetch('/api/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            minutes: parseInt(form.minutes.value),
+            task: form.task.value
+          })
+        });
 
-          const data = await response.json();
-          if (data.success) {
-            window.location.href = '/payment/' + data.workItemId;
-          } else if (data.requiresAuth) {
-            window.location.href = '/auth/login';
-          } else {
-            alert('Error: ' + data.error);
-            button.disabled = false;
-            button.textContent = 'Submit Task';
-          }
-        } catch (error) {
-          alert('Error submitting task. Please try again.');
+        const data = await response.json();
+        if (data.success) {
+          window.location.href = '/payment/' + data.workItemId;
+        } else if (data.requiresAuth) {
+          window.location.href = '/auth/login';
+        } else {
+          alert('Error: ' + data.error);
           button.disabled = false;
-          button.textContent = 'Submit Task';
+          button.textContent = 'Submit Task & Pay with Solana';
         }
-      });
-    }
+      } catch (error) {
+        alert('Error submitting task. Please try again.');
+        button.disabled = false;
+        button.textContent = 'Submit Task & Pay with Solana';
+      }
+    });
   </script>
 </body>
 </html>`;
