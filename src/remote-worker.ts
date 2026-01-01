@@ -1,4 +1,8 @@
 import nodemailer from "nodemailer";
+import { mkdir, readdir, stat } from "fs/promises";
+import { join } from "path";
+import archiver from "archiver";
+import { createWriteStream, existsSync } from "fs";
 
 // Configuration from environment
 const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:3000";
@@ -48,6 +52,77 @@ async function apiRequest(
   }
 }
 
+// Create a unique task directory
+async function createTaskDirectory(taskId: number): Promise<string> {
+  const baseDir = process.env.HOME || "/home/claude";
+  const taskDir = join(baseDir, "tasks", `task-${taskId}-${Date.now()}`);
+  await mkdir(taskDir, { recursive: true });
+  return taskDir;
+}
+
+// Get all files in a directory recursively
+async function getFilesRecursively(dir: string, baseDir: string = dir): Promise<string[]> {
+  const files: string[] = [];
+  try {
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        // Skip node_modules and hidden directories
+        if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+        files.push(...await getFilesRecursively(fullPath, baseDir));
+      } else {
+        files.push(fullPath);
+      }
+    }
+  } catch (e) {
+    console.error(`Error reading directory ${dir}:`, e);
+  }
+  return files;
+}
+
+// Zip all files in a directory
+async function zipDirectory(sourceDir: string, outputPath: string): Promise<boolean> {
+  return new Promise(async (resolve) => {
+    try {
+      const files = await getFilesRecursively(sourceDir);
+
+      if (files.length === 0) {
+        console.log("No files to zip");
+        resolve(false);
+        return;
+      }
+
+      console.log(`Zipping ${files.length} files from ${sourceDir}`);
+
+      const output = createWriteStream(outputPath);
+      const archive = archiver("zip", { zlib: { level: 9 } });
+
+      output.on("close", () => {
+        console.log(`Created zip archive: ${outputPath} (${archive.pointer()} bytes)`);
+        resolve(true);
+      });
+
+      archive.on("error", (err) => {
+        console.error("Archiver error:", err);
+        resolve(false);
+      });
+
+      archive.pipe(output);
+
+      for (const file of files) {
+        const relativePath = file.replace(sourceDir + "/", "");
+        archive.file(file, { name: relativePath });
+      }
+
+      await archive.finalize();
+    } catch (e) {
+      console.error("Error zipping directory:", e);
+      resolve(false);
+    }
+  });
+}
+
 // Create email transporter
 function createTransporter() {
   return nodemailer.createTransport({
@@ -64,12 +139,15 @@ function createTransporter() {
 // Execute Claude Code CLI with task using Bun.spawn
 async function executeClaudeCode(
   task: string,
-  maxMinutes: number
+  maxMinutes: number,
+  workingDir: string
 ): Promise<{ success: boolean; output: string; error?: string }> {
   const startTime = Date.now();
   const maxTimeMs = maxMinutes * 60 * 1000;
 
   const prompt = `You have a maximum of ${maxMinutes} minutes to complete this task. If you cannot finish, provide what you have accomplished so far.
+
+IMPORTANT: Save all generated files and artifacts in the current working directory.
 
 TASK:
 ${task}
@@ -77,9 +155,10 @@ ${task}
 Please proceed with the task now.`;
 
   console.log(`Starting Claude Code for task (max ${maxMinutes} min)...`);
+  console.log(`Working directory: ${workingDir}`);
 
   const proc = Bun.spawn(["claude", "-p", prompt, "--output-format", "stream-json", "--verbose", "--no-session-persistence", "--allowedTools", "WebSearch,WebFetch,Read,Write,Edit,Bash,Glob,Grep"], {
-    cwd: process.env.HOME || "/home/claude",
+    cwd: workingDir,
     env: { ...process.env },
     stdout: "pipe",
     stderr: "pipe",
@@ -167,7 +246,8 @@ Please proceed with the task now.`;
 // Send result email
 async function sendResultEmail(
   workItem: WorkItem,
-  result: { success: boolean; output: string; error?: string }
+  result: { success: boolean; output: string; error?: string },
+  attachmentPath?: string
 ): Promise<boolean> {
   try {
     const transporter = createTransporter();
@@ -175,6 +255,8 @@ async function sendResultEmail(
     const subject = result.success
       ? `Your AI Task is Complete - WorkingDevsHero`
       : `AI Task Update - WorkingDevsHero`;
+
+    const hasAttachment = attachmentPath && existsSync(attachmentPath);
 
     const html = `
 <!DOCTYPE html>
@@ -212,6 +294,13 @@ async function sendResultEmail(
         <pre>${result.output.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
         ${result.error ? `<p style="color: #ff6b6b;"><strong>Errors:</strong> ${result.error.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>` : ""}
       </div>
+
+      ${hasAttachment ? `
+      <div class="task" style="border-left-color: #14f195;">
+        <h3>📎 Attachments</h3>
+        <p>Your generated files are attached as a ZIP archive. Extract to access all created artifacts.</p>
+      </div>
+      ` : ""}
     </div>
     <div class="footer">
       <p>Thank you for using WorkingDevsHero!</p>
@@ -222,13 +311,25 @@ async function sendResultEmail(
 </html>
     `;
 
-    await transporter.sendMail({
+    const mailOptions: any = {
       from: `"WorkingDevsHero" <${EMAIL_FROM}>`,
       to: workItem.email,
       subject,
       html,
-      text: `WorkingDevsHero - Task ${result.success ? "Completed" : "Update"}\n\nYour Task:\n${workItem.taskDescription}\n\nResult:\n${result.output}\n\n${result.error ? `Errors: ${result.error}` : ""}`,
-    });
+      text: `WorkingDevsHero - Task ${result.success ? "Completed" : "Update"}\n\nYour Task:\n${workItem.taskDescription}\n\nResult:\n${result.output}\n\n${result.error ? `Errors: ${result.error}` : ""}${hasAttachment ? "\n\nNote: Generated files are attached as a ZIP archive." : ""}`,
+    };
+
+    if (hasAttachment) {
+      mailOptions.attachments = [
+        {
+          filename: `task-${workItem.id}-artifacts.zip`,
+          path: attachmentPath,
+        },
+      ];
+      console.log(`Attaching zip file: ${attachmentPath}`);
+    }
+
+    await transporter.sendMail(mailOptions);
 
     console.log(`Email sent to ${workItem.email}`);
     return true;
@@ -253,8 +354,25 @@ async function processWorkItem(workItem: WorkItem): Promise<void> {
     return;
   }
 
-  // Execute Claude Code
-  const result = await executeClaudeCode(workItem.taskDescription, workItem.maxMinutes);
+  // Create a unique task directory
+  const taskDir = await createTaskDirectory(workItem.id);
+  console.log(`Created task directory: ${taskDir}`);
+
+  // Execute Claude Code in the task directory
+  const result = await executeClaudeCode(workItem.taskDescription, workItem.maxMinutes, taskDir);
+
+  // Zip any created artifacts
+  let zipPath: string | undefined;
+  const files = await getFilesRecursively(taskDir);
+  if (files.length > 0) {
+    zipPath = join(taskDir, `task-${workItem.id}-artifacts.zip`);
+    const zipped = await zipDirectory(taskDir, zipPath);
+    if (!zipped) {
+      zipPath = undefined;
+    }
+  } else {
+    console.log("No artifacts created in task directory");
+  }
 
   // Report completion
   const completeResult = await apiRequest("POST", `/api/worker/complete/${workItem.id}`, {
@@ -267,13 +385,16 @@ async function processWorkItem(workItem: WorkItem): Promise<void> {
     console.error(`Failed to report completion for task #${workItem.id}:`, completeResult.data);
   }
 
-  // Send email notification
-  const emailSent = await sendResultEmail(workItem, result);
+  // Send email notification with artifacts attached
+  const emailSent = await sendResultEmail(workItem, result, zipPath);
   if (!emailSent) {
     console.error(`Failed to send email for work item #${workItem.id}`);
   }
 
   console.log(`\nWork item #${workItem.id} ${result.success ? "completed" : "failed"}`);
+  if (zipPath) {
+    console.log(`Artifacts attached: ${zipPath}`);
+  }
 }
 
 // Fetch pending tasks from remote API
