@@ -1,5 +1,5 @@
 import type { FC, PropsWithChildren } from 'hono/jsx';
-import { html } from 'hono/html';
+import { html, raw } from 'hono/html';
 
 export const baseStyles = `
   :root {
@@ -353,8 +353,8 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-        <style>{html`${baseStyles}${includeModal ? modalStyles : ''}${styles}`}</style>
+        <script>{raw(themeInitScript)}</script>
+        <style>{raw(baseStyles + (includeModal ? modalStyles : '') + styles)}</style>
       </head>
       <body>
         {showBlobs && (
@@ -366,7 +366,7 @@ export const Layout: FC<PropsWithChildren<LayoutProps>> = ({
         )}
         {children}
         {includeModal && <Modal />}
-        <script dangerouslySetInnerHTML={{ __html: themeToggleScript + (includeModal ? modalScript : '') + scripts }} />
+        <script>{raw(themeToggleScript + (includeModal ? modalScript : '') + scripts)}</script>
       </body>
     </html>
   );
