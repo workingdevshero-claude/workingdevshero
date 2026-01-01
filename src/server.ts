@@ -1816,7 +1816,7 @@ app.get("/dashboard", async (c) => {
     <div class="nav-links">
       <a href="/dashboard/in-progress">View In Progress</a>
       <a href="/dashboard/completed">View Completed</a>
-      <a href="/#submit" class="new-task-btn">New Task</a>
+      <a href="/submit" class="new-task-btn">New Task</a>
     </div>
 
     <div class="section">
