@@ -152,6 +152,12 @@ export const buttonStyles = `
     font-size: 0.9rem;
   }
 
+  .btn-nav {
+    padding: 10px 20px;
+    font-size: 0.95rem;
+    border-radius: 12px;
+  }
+
   .cta-button {
     background: var(--accent-gradient);
     color: white;

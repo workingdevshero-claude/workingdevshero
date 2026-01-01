@@ -1,5 +1,5 @@
 import type { FC } from 'hono/jsx';
-import { Layout, Header, headerStyles, buttonStyles } from '../components';
+import { Layout, Header, headerStyles } from '../components';
 import type { User, WorkItem } from '../db';
 
 interface DashboardProps {
@@ -12,7 +12,6 @@ interface DashboardProps {
 
 const dashboardStyles = `
   ${headerStyles}
-  ${buttonStyles}
 
   .container {
     max-width: 1000px;
@@ -182,17 +181,8 @@ const dashboardStyles = `
     color: var(--accent-primary);
   }
 
-  .nav-links .new-task-btn {
-    background: var(--accent-gradient);
-    border: none;
-    color: white;
-    padding: 12px 28px;
-    box-shadow: var(--shadow-sm);
-  }
-
-  .nav-links .new-task-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+  .nav-links .btn {
+    border-radius: 50px;
   }
 
   .empty {
@@ -234,7 +224,7 @@ export const Dashboard: FC<DashboardProps> = ({ user, allTasks, inProgress, comp
         <div class="nav-links">
           <a href="/dashboard/in-progress">View In Progress</a>
           <a href="/dashboard/completed">View Completed</a>
-          <a href="/submit" class="new-task-btn">+ New Task</a>
+          <a href="/submit" class="btn btn-primary">+ New Task</a>
         </div>
 
         <div class="section">

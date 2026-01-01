@@ -1,12 +1,13 @@
 import type { FC } from 'hono/jsx';
 import type { User } from '../db';
+import { buttonStyles } from './Form';
 
 interface HeaderProps {
   user?: User | null;
   logoHref?: string;
 }
 
-export const headerStyles = `
+export const headerStyles = buttonStyles + `
   header {
     padding: 16px 0;
     border-bottom: 1px solid var(--border-color);
@@ -80,24 +81,6 @@ export const headerStyles = `
     font-size: 0.9rem;
   }
 
-  .nav-button {
-    color: white !important;
-    text-decoration: none;
-    background: var(--accent-gradient);
-    padding: 10px 20px;
-    border-radius: 12px;
-    font-weight: 600;
-    transition: all 0.2s;
-    box-shadow: var(--shadow-sm);
-  }
-
-  .nav-button:hover {
-    text-decoration: none;
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-md);
-    background: var(--accent-gradient-hover);
-  }
-
   .theme-toggle {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
@@ -155,7 +138,7 @@ export const Header: FC<HeaderProps> = ({ user, logoHref = '/' }) => {
           ) : (
             <>
               <a href="/auth/login">Login</a>
-              <a href="/auth/register" class="nav-button">Sign Up</a>
+              <a href="/auth/register" class="btn btn-primary btn-nav">Sign Up</a>
             </>
           )}
         </nav>
