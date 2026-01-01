@@ -19,11 +19,11 @@ function verifyWorkerAuth(authHeader: string | undefined): boolean {
   return token === WORKER_API_KEY;
 }
 
-// Get current user from session cookie
-function getCurrentUser(c: any): User | null {
+// Get current user from session cookie (async)
+async function getCurrentUser(c: any): Promise<User | null> {
   const cookieHeader = c.req.header("Cookie");
   const sessionId = getSessionFromCookie(cookieHeader);
-  const { valid, user } = validateSession(sessionId);
+  const { valid, user } = await validateSession(sessionId);
   return valid && user ? user : null;
 }
 
@@ -45,13 +45,13 @@ const RATE_PER_MINUTE_USD = 0.10;
 // Landing page
 app.get("/", async (c) => {
   const solPrice = await getSolPrice();
-  const user = getCurrentUser(c);
+  const user = await getCurrentUser(c);
   return c.html(<Landing user={user} solPrice={solPrice} />);
 });
 
 // Submit task page (requires authentication)
 app.get("/submit", async (c) => {
-  const user = getCurrentUser(c);
+  const user = await getCurrentUser(c);
   if (!user) return c.redirect("/auth/login");
   return c.html(<Submit user={user} />);
 });
@@ -59,13 +59,13 @@ app.get("/submit", async (c) => {
 // Payment page
 app.get("/payment/:id", async (c) => {
   const id = parseInt(c.req.param("id"));
-  const workItem = getWorkItemById(id);
+  const workItem = await getWorkItemById(id);
 
   if (!workItem) {
     return c.text("Work item not found", 404);
   }
 
-  const user = getCurrentUser(c);
+  const user = await getCurrentUser(c);
   const costSol = await getUniquePaymentAmount(workItem.id, workItem.cost_usd);
 
   return c.html(<Payment user={user} workItem={workItem} costSol={costSol} paymentWallet={PAYMENT_WALLET} />);
@@ -74,7 +74,7 @@ app.get("/payment/:id", async (c) => {
 // Task status page
 app.get("/status/:id", async (c) => {
   const id = parseInt(c.req.param("id"));
-  const workItem = getWorkItemById(id);
+  const workItem = await getWorkItemById(id);
 
   if (!workItem) {
     return c.text("Task not found", 404);
@@ -88,8 +88,8 @@ app.get("/status/:id", async (c) => {
 // ==========================================
 
 // Registration page
-app.get("/auth/register", (c) => {
-  const user = getCurrentUser(c);
+app.get("/auth/register", async (c) => {
+  const user = await getCurrentUser(c);
   if (user) return c.redirect("/dashboard");
   return c.html(<Register />);
 });
@@ -125,8 +125,8 @@ app.post("/auth/register", async (c) => {
 });
 
 // Login page
-app.get("/auth/login", (c) => {
-  const user = getCurrentUser(c);
+app.get("/auth/login", async (c) => {
+  const user = await getCurrentUser(c);
   if (user) return c.redirect("/dashboard");
   return c.html(<Login />);
 });
@@ -156,11 +156,11 @@ app.post("/auth/login", async (c) => {
 });
 
 // Logout
-app.post("/auth/logout", (c) => {
+app.post("/auth/logout", async (c) => {
   const cookieHeader = c.req.header("Cookie");
   const sessionId = getSessionFromCookie(cookieHeader);
   if (sessionId) {
-    logoutUser(sessionId);
+    await logoutUser(sessionId);
   }
   return c.json(
     { success: true },
@@ -172,11 +172,11 @@ app.post("/auth/logout", (c) => {
   );
 });
 
-app.get("/auth/logout", (c) => {
+app.get("/auth/logout", async (c) => {
   const cookieHeader = c.req.header("Cookie");
   const sessionId = getSessionFromCookie(cookieHeader);
   if (sessionId) {
-    logoutUser(sessionId);
+    await logoutUser(sessionId);
   }
   return c.redirect("/", {
     headers: {
@@ -191,10 +191,10 @@ app.get("/auth/logout", (c) => {
 
 // Main dashboard
 app.get("/dashboard", async (c) => {
-  const user = getCurrentUser(c);
+  const user = await getCurrentUser(c);
   if (!user) return c.redirect("/auth/login");
 
-  const allTasks = getWorkItemsByUserId(user.id);
+  const allTasks = await getWorkItemsByUserId(user.id);
   const inProgress = allTasks.filter(t => ["paid", "processing"].includes(t.status));
   const completed = allTasks.filter(t => ["completed", "failed"].includes(t.status));
   const pending = allTasks.filter(t => t.status === "pending_payment");
@@ -204,19 +204,19 @@ app.get("/dashboard", async (c) => {
 
 // In-progress tasks page
 app.get("/dashboard/in-progress", async (c) => {
-  const user = getCurrentUser(c);
+  const user = await getCurrentUser(c);
   if (!user) return c.redirect("/auth/login");
 
-  const tasks = getWorkItemsByUserIdAndStatus(user.id, ["paid", "processing"]);
+  const tasks = await getWorkItemsByUserIdAndStatus(user.id, ["paid", "processing"]);
   return c.html(<DashboardInProgress user={user} tasks={tasks} />);
 });
 
 // Completed tasks page
 app.get("/dashboard/completed", async (c) => {
-  const user = getCurrentUser(c);
+  const user = await getCurrentUser(c);
   if (!user) return c.redirect("/auth/login");
 
-  const tasks = getWorkItemsByUserIdAndStatus(user.id, ["completed", "failed"]);
+  const tasks = await getWorkItemsByUserIdAndStatus(user.id, ["completed", "failed"]);
   return c.html(<DashboardCompleted user={user} tasks={tasks} />);
 });
 
@@ -227,7 +227,7 @@ app.get("/dashboard/completed", async (c) => {
 // API endpoint to submit work items (requires authentication)
 app.post("/api/submit", async (c) => {
   try {
-    const user = getCurrentUser(c);
+    const user = await getCurrentUser(c);
 
     // Require authentication
     if (!user) {
@@ -247,7 +247,7 @@ app.post("/api/submit", async (c) => {
 
     const costUsd = minutes * RATE_PER_MINUTE_USD;
     // Create work item with pending_payment status - user must pay via Solana
-    const workItem = createWorkItem(user.email, minutes, task, costUsd, PAYMENT_WALLET, user.id);
+    const workItem = await createWorkItem(user.email, minutes, task, costUsd, PAYMENT_WALLET, user.id);
 
     return c.json({
       success: true,
@@ -264,7 +264,7 @@ app.post("/api/submit", async (c) => {
 // API endpoint to check payment status
 app.get("/api/check-payment/:id", async (c) => {
   const id = parseInt(c.req.param("id"));
-  const workItem = getWorkItemById(id);
+  const workItem = await getWorkItemById(id);
 
   if (!workItem) {
     return c.json({ error: "Not found" }, 404);
@@ -285,12 +285,12 @@ app.get("/api/check-payment/:id", async (c) => {
 
   if (result.found && result.signature) {
     // Verify this transaction hasn't already been used for another task
-    if (isTransactionUsed(result.signature)) {
+    if (await isTransactionUsed(result.signature)) {
       console.log(`Transaction ${result.signature} already used for another task`);
       return c.json({ paid: false, error: "Transaction already used" });
     }
 
-    updateWorkItemPayment(workItem.id, result.signature, result.amount!);
+    await updateWorkItemPayment(workItem.id, result.signature, result.amount!);
     return c.json({ paid: true, signature: result.signature });
   }
 
@@ -299,13 +299,13 @@ app.get("/api/check-payment/:id", async (c) => {
 
 // API endpoint to delete a pending payment task
 app.delete("/api/task/:id", async (c) => {
-  const user = getCurrentUser(c);
+  const user = await getCurrentUser(c);
   if (!user) {
     return c.json({ success: false, error: "Authentication required" }, 401);
   }
 
   const id = parseInt(c.req.param("id"));
-  const workItem = getWorkItemById(id);
+  const workItem = await getWorkItemById(id);
 
   if (!workItem) {
     return c.json({ success: false, error: "Task not found" }, 404);
@@ -321,7 +321,7 @@ app.delete("/api/task/:id", async (c) => {
     return c.json({ success: false, error: "Can only delete tasks pending payment" }, 400);
   }
 
-  const deleted = deleteWorkItem(id);
+  const deleted = await deleteWorkItem(id);
   if (deleted) {
     return c.json({ success: true });
   } else {
@@ -332,7 +332,7 @@ app.delete("/api/task/:id", async (c) => {
 // API endpoint to get queue status
 app.get("/api/status", async (c) => {
   const balance = await getWalletBalance();
-  const paidItems = getPaidItems();
+  const paidItems = await getPaidItems();
 
   return c.json({
     walletBalance: balance,
@@ -349,7 +349,7 @@ app.get("/api/status", async (c) => {
 // API endpoint to get individual task status
 app.get("/api/task/:id", async (c) => {
   const id = parseInt(c.req.param("id"));
-  const workItem = getWorkItemById(id);
+  const workItem = await getWorkItemById(id);
 
   if (!workItem) {
     return c.json({ error: "Task not found" }, 404);
@@ -380,7 +380,7 @@ app.get("/api/worker/pending", async (c) => {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  const paidItems = getPaidItems();
+  const paidItems = await getPaidItems();
   return c.json({
     items: paidItems.map((item) => ({
       id: item.id,
@@ -404,7 +404,7 @@ app.post("/api/worker/claim/:id", async (c) => {
   }
 
   const id = parseInt(c.req.param("id"));
-  const workItem = getWorkItemById(id);
+  const workItem = await getWorkItemById(id);
 
   if (!workItem) {
     return c.json({ error: "Task not found" }, 404);
@@ -414,7 +414,7 @@ app.post("/api/worker/claim/:id", async (c) => {
     return c.json({ error: "Task is not in paid status" }, 400);
   }
 
-  updateWorkItemStatus(id, "processing", {
+  await updateWorkItemStatus(id, "processing", {
     started_at: new Date().toISOString(),
   });
 
@@ -432,7 +432,7 @@ app.post("/api/worker/complete/:id", async (c) => {
   const body = await c.req.json();
   const { success, output, error } = body;
 
-  const workItem = getWorkItemById(id);
+  const workItem = await getWorkItemById(id);
 
   if (!workItem) {
     return c.json({ error: "Task not found" }, 404);
@@ -442,7 +442,7 @@ app.post("/api/worker/complete/:id", async (c) => {
     return c.json({ error: "Task is not in processing status" }, 400);
   }
 
-  updateWorkItemStatus(id, success ? "completed" : "failed", {
+  await updateWorkItemStatus(id, success ? "completed" : "failed", {
     completed_at: new Date().toISOString(),
     result: JSON.stringify({ success, output, error }),
   });
@@ -458,7 +458,7 @@ app.post("/api/test/mark-paid/:id", async (c) => {
   }
 
   const id = parseInt(c.req.param("id"));
-  const workItem = getWorkItemById(id);
+  const workItem = await getWorkItemById(id);
 
   if (!workItem) {
     return c.json({ error: "Task not found" }, 404);
@@ -468,7 +468,7 @@ app.post("/api/test/mark-paid/:id", async (c) => {
     return c.json({ error: "Task is not pending_payment" }, 400);
   }
 
-  updateWorkItemPayment(id, "TEST-" + Date.now(), 0.001);
+  await updateWorkItemPayment(id, "TEST-" + Date.now(), 0.001);
   return c.json({ success: true, message: "Task marked as paid for testing" });
 });
 
@@ -480,7 +480,7 @@ app.get("/api/worker/task/:id", async (c) => {
   }
 
   const id = parseInt(c.req.param("id"));
-  const workItem = getWorkItemById(id);
+  const workItem = await getWorkItemById(id);
 
   if (!workItem) {
     return c.json({ error: "Task not found" }, 404);

@@ -24,7 +24,7 @@ export function generateSessionId(): string {
 // Register a new user
 export async function registerUser(email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
   // Check if user already exists
-  const existingUser = getUserByEmail(email);
+  const existingUser = await getUserByEmail(email);
   if (existingUser) {
     return { success: false, error: "Email already registered" };
   }
@@ -42,7 +42,7 @@ export async function registerUser(email: string, password: string): Promise<{ s
 
   try {
     const passwordHash = await hashPassword(password);
-    const user = createUser(email, passwordHash);
+    const user = await createUser(email, passwordHash);
     return { success: true, user };
   } catch (error) {
     console.error("Failed to register user:", error);
@@ -52,7 +52,7 @@ export async function registerUser(email: string, password: string): Promise<{ s
 
 // Login user and create session
 export async function loginUser(email: string, password: string): Promise<{ success: boolean; sessionId?: string; user?: User; error?: string }> {
-  const user = getUserByEmail(email);
+  const user = await getUserByEmail(email);
   if (!user) {
     return { success: false, error: "Invalid email or password" };
   }
@@ -65,7 +65,7 @@ export async function loginUser(email: string, password: string): Promise<{ succ
   try {
     const sessionId = generateSessionId();
     const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
-    createSession(sessionId, user.id, expiresAt);
+    await createSession(sessionId, user.id, expiresAt);
     return { success: true, sessionId, user };
   } catch (error) {
     console.error("Failed to create session:", error);
@@ -74,12 +74,12 @@ export async function loginUser(email: string, password: string): Promise<{ succ
 }
 
 // Validate session and get user
-export function validateSession(sessionId: string | undefined): { valid: boolean; user?: User; session?: Session } {
+export async function validateSession(sessionId: string | undefined): Promise<{ valid: boolean; user?: User; session?: Session }> {
   if (!sessionId) {
     return { valid: false };
   }
 
-  const sessionData = getSession(sessionId);
+  const sessionData = await getSession(sessionId);
   if (!sessionData) {
     return { valid: false };
   }
@@ -88,8 +88,8 @@ export function validateSession(sessionId: string | undefined): { valid: boolean
 }
 
 // Logout user
-export function logoutUser(sessionId: string): void {
-  deleteSession(sessionId);
+export async function logoutUser(sessionId: string): Promise<void> {
+  await deleteSession(sessionId);
 }
 
 // Parse session cookie from request

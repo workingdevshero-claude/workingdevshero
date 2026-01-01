@@ -9,3 +9,7 @@ services:
         value: 3000
       - key: WORKER_API_KEY
         sync: false
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false

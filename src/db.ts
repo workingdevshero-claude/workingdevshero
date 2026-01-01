@@ -1,67 +1,136 @@
+import { createClient } from "@libsql/client";
 import { Database } from "bun:sqlite";
 import path from "path";
 import fs from "fs";
 
-const dbPath = path.join(import.meta.dir, "..", "data", "workingdevshero.db");
+// Use Turso in production, local SQLite in development
+const isProduction = !!process.env.TURSO_DATABASE_URL;
 
-// Ensure data directory exists
-const dataDir = path.dirname(dbPath);
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+interface DbClient {
+  execute(sql: string, params?: any[]): Promise<{ rows: any[]; lastInsertRowid?: number | bigint; changes?: number }>;
+  executeSync?(sql: string, params?: any[]): { rows: any[]; lastInsertRowid?: number | bigint; changes?: number };
 }
 
-export const db = new Database(dbPath);
+let dbClient: DbClient;
+
+if (isProduction) {
+  // Turso for production
+  const turso = createClient({
+    url: process.env.TURSO_DATABASE_URL!,
+    authToken: process.env.TURSO_AUTH_TOKEN,
+  });
+
+  dbClient = {
+    async execute(sql: string, params?: any[]) {
+      const result = await turso.execute({ sql, args: params || [] });
+      return {
+        rows: result.rows as any[],
+        lastInsertRowid: result.lastInsertRowid,
+        changes: result.rowsAffected,
+      };
+    }
+  };
+
+  console.log("Using Turso database");
+} else {
+  // Local SQLite for development
+  const dbPath = path.join(import.meta.dir, "..", "data", "workingdevshero.db");
+  const dataDir = path.dirname(dbPath);
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+
+  const localDb = new Database(dbPath);
+
+  dbClient = {
+    async execute(sql: string, params?: any[]) {
+      // Handle different SQL statement types
+      const trimmedSql = sql.trim().toUpperCase();
+      if (trimmedSql.startsWith("SELECT")) {
+        const stmt = localDb.prepare(sql);
+        const rows = params ? stmt.all(...params) : stmt.all();
+        return { rows: rows as any[] };
+      } else {
+        const stmt = localDb.prepare(sql);
+        const result = params ? stmt.run(...params) : stmt.run();
+        return {
+          rows: [],
+          lastInsertRowid: result.lastInsertRowid,
+          changes: result.changes,
+        };
+      }
+    },
+    executeSync(sql: string, params?: any[]) {
+      const trimmedSql = sql.trim().toUpperCase();
+      if (trimmedSql.startsWith("SELECT")) {
+        const stmt = localDb.prepare(sql);
+        const rows = params ? stmt.all(...params) : stmt.all();
+        return { rows: rows as any[] };
+      } else {
+        const stmt = localDb.prepare(sql);
+        const result = params ? stmt.run(...params) : stmt.run();
+        return {
+          rows: [],
+          lastInsertRowid: result.lastInsertRowid,
+          changes: result.changes,
+        };
+      }
+    }
+  };
+
+  console.log("Using local SQLite database at:", dbPath);
+}
 
 // Initialize database schema
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+async function initializeSchema() {
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 
-  CREATE TABLE IF NOT EXISTS sessions (
-    id TEXT PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id),
-    expires_at DATETIME NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      expires_at DATETIME NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 
-  CREATE TABLE IF NOT EXISTS work_items (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT NOT NULL,
-    max_minutes INTEGER NOT NULL,
-    task_description TEXT NOT NULL,
-    cost_usd REAL NOT NULL,
-    cost_sol REAL,
-    payment_address TEXT NOT NULL,
-    transaction_signature TEXT,
-    status TEXT DEFAULT 'pending_payment',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    paid_at DATETIME,
-    started_at DATETIME,
-    completed_at DATETIME,
-    result TEXT
-  );
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS work_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      email TEXT NOT NULL,
+      max_minutes INTEGER NOT NULL,
+      task_description TEXT NOT NULL,
+      cost_usd REAL NOT NULL,
+      cost_sol REAL,
+      payment_address TEXT NOT NULL,
+      transaction_signature TEXT,
+      status TEXT DEFAULT 'pending_payment',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      paid_at DATETIME,
+      started_at DATETIME,
+      completed_at DATETIME,
+      result TEXT
+    )
+  `);
 
-  CREATE INDEX IF NOT EXISTS idx_work_items_status ON work_items(status);
-  CREATE INDEX IF NOT EXISTS idx_work_items_payment ON work_items(payment_address, status);
-  CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
-`);
+  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_work_items_status ON work_items(status)`);
+  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_work_items_payment ON work_items(payment_address, status)`);
+  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_work_items_user ON work_items(user_id)`);
+  await dbClient.execute(`CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)`);
 
-// Migration: Add user_id column to work_items if it doesn't exist
-try {
-  db.exec(`ALTER TABLE work_items ADD COLUMN user_id INTEGER REFERENCES users(id)`);
-  console.log("Migration: Added user_id column to work_items");
-} catch (e) {
-  // Column already exists, ignore
+  console.log("Database schema initialized");
 }
 
-// Create index after migration
-db.exec(`CREATE INDEX IF NOT EXISTS idx_work_items_user ON work_items(user_id);`);
-
-console.log("Database initialized at:", dbPath);
+// Initialize on import
+const schemaReady = initializeSchema();
 
 // User types and functions
 export interface User {
@@ -78,54 +147,64 @@ export interface Session {
   created_at: string;
 }
 
-export function createUser(email: string, passwordHash: string): User {
-  const stmt = db.prepare(`
-    INSERT INTO users (email, password_hash)
-    VALUES (?, ?)
-  `);
-  const result = stmt.run(email, passwordHash);
-  return db.prepare("SELECT * FROM users WHERE id = ?").get(result.lastInsertRowid) as User;
+export async function createUser(email: string, passwordHash: string): Promise<User> {
+  await schemaReady;
+  const result = await dbClient.execute(
+    `INSERT INTO users (email, password_hash) VALUES (?, ?)`,
+    [email, passwordHash]
+  );
+  const users = await dbClient.execute(`SELECT * FROM users WHERE id = ?`, [result.lastInsertRowid]);
+  return users.rows[0] as User;
 }
 
-export function getUserByEmail(email: string): User | undefined {
-  return db.prepare("SELECT * FROM users WHERE email = ?").get(email) as User | undefined;
+export async function getUserByEmail(email: string): Promise<User | undefined> {
+  await schemaReady;
+  const result = await dbClient.execute(`SELECT * FROM users WHERE email = ?`, [email]);
+  return result.rows[0] as User | undefined;
 }
 
-export function getUserById(id: number): User | undefined {
-  return db.prepare("SELECT * FROM users WHERE id = ?").get(id) as User | undefined;
+export async function getUserById(id: number): Promise<User | undefined> {
+  await schemaReady;
+  const result = await dbClient.execute(`SELECT * FROM users WHERE id = ?`, [id]);
+  return result.rows[0] as User | undefined;
 }
 
-export function createSession(sessionId: string, userId: number, expiresAt: Date): Session {
-  const stmt = db.prepare(`
-    INSERT INTO sessions (id, user_id, expires_at)
-    VALUES (?, ?, ?)
-  `);
-  stmt.run(sessionId, userId, expiresAt.toISOString());
-  return db.prepare("SELECT * FROM sessions WHERE id = ?").get(sessionId) as Session;
+export async function createSession(sessionId: string, userId: number, expiresAt: Date): Promise<Session> {
+  await schemaReady;
+  await dbClient.execute(
+    `INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)`,
+    [sessionId, userId, expiresAt.toISOString()]
+  );
+  const result = await dbClient.execute(`SELECT * FROM sessions WHERE id = ?`, [sessionId]);
+  return result.rows[0] as Session;
 }
 
-export function getSession(sessionId: string): (Session & { user: User }) | undefined {
-  const session = db.prepare("SELECT * FROM sessions WHERE id = ?").get(sessionId) as Session | undefined;
+export async function getSession(sessionId: string): Promise<(Session & { user: User }) | undefined> {
+  await schemaReady;
+  const sessionResult = await dbClient.execute(`SELECT * FROM sessions WHERE id = ?`, [sessionId]);
+  const session = sessionResult.rows[0] as Session | undefined;
   if (!session) return undefined;
 
   // Check if expired
   if (new Date(session.expires_at) < new Date()) {
-    deleteSession(sessionId);
+    await deleteSession(sessionId);
     return undefined;
   }
 
-  const user = getUserById(session.user_id);
+  const user = await getUserById(session.user_id);
   if (!user) return undefined;
 
   return { ...session, user };
 }
 
-export function deleteSession(sessionId: string): void {
-  db.prepare("DELETE FROM sessions WHERE id = ?").run(sessionId);
+export async function deleteSession(sessionId: string): Promise<void> {
+  await schemaReady;
+  await dbClient.execute(`DELETE FROM sessions WHERE id = ?`, [sessionId]);
 }
 
-export function deleteUserSessions(userId: number): void {
-  db.prepare("DELETE FROM sessions WHERE user_id = ?").run(userId);
+export async function deleteUserSessions(userId: number): Promise<void> {
+  await schemaReady;
+  await dbClient.execute(`DELETE FROM sessions WHERE user_id = ?`, [userId]);
 }
 
 export interface WorkItem {
@@ -146,36 +225,43 @@ export interface WorkItem {
   result: string | null;
 }
 
-export function createWorkItem(
+export async function createWorkItem(
   email: string,
   maxMinutes: number,
   taskDescription: string,
   costUsd: number,
   paymentAddress: string,
   userId?: number
-): WorkItem {
-  const stmt = db.prepare(`
-    INSERT INTO work_items (email, max_minutes, task_description, cost_usd, payment_address, user_id)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
-  const result = stmt.run(email, maxMinutes, taskDescription, costUsd, paymentAddress, userId || null);
-
-  return db.prepare("SELECT * FROM work_items WHERE id = ?").get(result.lastInsertRowid) as WorkItem;
+): Promise<WorkItem> {
+  await schemaReady;
+  const result = await dbClient.execute(
+    `INSERT INTO work_items (email, max_minutes, task_description, cost_usd, payment_address, user_id) VALUES (?, ?, ?, ?, ?, ?)`,
+    [email, maxMinutes, taskDescription, costUsd, paymentAddress, userId || null]
+  );
+  const items = await dbClient.execute(`SELECT * FROM work_items WHERE id = ?`, [result.lastInsertRowid]);
+  return items.rows[0] as WorkItem;
 }
 
-export function getWorkItemById(id: number): WorkItem | undefined {
-  return db.prepare("SELECT * FROM work_items WHERE id = ?").get(id) as WorkItem | undefined;
+export async function getWorkItemById(id: number): Promise<WorkItem | undefined> {
+  await schemaReady;
+  const result = await dbClient.execute(`SELECT * FROM work_items WHERE id = ?`, [id]);
+  return result.rows[0] as WorkItem | undefined;
 }
 
-export function getPendingPaymentItems(): WorkItem[] {
-  return db.prepare("SELECT * FROM work_items WHERE status = 'pending_payment'").all() as WorkItem[];
+export async function getPendingPaymentItems(): Promise<WorkItem[]> {
+  await schemaReady;
+  const result = await dbClient.execute(`SELECT * FROM work_items WHERE status = 'pending_payment'`);
+  return result.rows as WorkItem[];
 }
 
-export function getPaidItems(): WorkItem[] {
-  return db.prepare("SELECT * FROM work_items WHERE status = 'paid' ORDER BY paid_at ASC").all() as WorkItem[];
+export async function getPaidItems(): Promise<WorkItem[]> {
+  await schemaReady;
+  const result = await dbClient.execute(`SELECT * FROM work_items WHERE status = 'paid' ORDER BY paid_at ASC`);
+  return result.rows as WorkItem[];
 }
 
-export function updateWorkItemStatus(id: number, status: string, additionalFields?: Record<string, any>): void {
+export async function updateWorkItemStatus(id: number, status: string, additionalFields?: Record<string, any>): Promise<void> {
+  await schemaReady;
   let sql = `UPDATE work_items SET status = ?`;
   const params: any[] = [status];
 
@@ -189,39 +275,59 @@ export function updateWorkItemStatus(id: number, status: string, additionalField
   sql += ` WHERE id = ?`;
   params.push(id);
 
-  db.prepare(sql).run(...params);
+  await dbClient.execute(sql, params);
 }
 
-export function updateWorkItemPayment(id: number, txSignature: string, costSol: number): void {
-  db.prepare(`
-    UPDATE work_items
-    SET status = 'paid', transaction_signature = ?, cost_sol = ?, paid_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).run(txSignature, costSol, id);
+export async function updateWorkItemPayment(id: number, txSignature: string, costSol: number): Promise<void> {
+  await schemaReady;
+  await dbClient.execute(
+    `UPDATE work_items SET status = 'paid', transaction_signature = ?, cost_sol = ?, paid_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [txSignature, costSol, id]
+  );
 }
 
-export function getWorkItemsByUserId(userId: number): WorkItem[] {
-  return db.prepare("SELECT * FROM work_items WHERE user_id = ? ORDER BY created_at DESC").all(userId) as WorkItem[];
+export async function getWorkItemsByUserId(userId: number): Promise<WorkItem[]> {
+  await schemaReady;
+  const result = await dbClient.execute(
+    `SELECT * FROM work_items WHERE user_id = ? ORDER BY created_at DESC`,
+    [userId]
+  );
+  return result.rows as WorkItem[];
 }
 
-export function getWorkItemsByUserIdAndStatus(userId: number, statuses: string[]): WorkItem[] {
+export async function getWorkItemsByUserIdAndStatus(userId: number, statuses: string[]): Promise<WorkItem[]> {
+  await schemaReady;
   const placeholders = statuses.map(() => "?").join(", ");
-  return db.prepare(`SELECT * FROM work_items WHERE user_id = ? AND status IN (${placeholders}) ORDER BY created_at DESC`).all(userId, ...statuses) as WorkItem[];
+  const result = await dbClient.execute(
+    `SELECT * FROM work_items WHERE user_id = ? AND status IN (${placeholders}) ORDER BY created_at DESC`,
+    [userId, ...statuses]
+  );
+  return result.rows as WorkItem[];
 }
 
-// Check if a transaction signature has already been used
-export function isTransactionUsed(signature: string): boolean {
-  const result = db.prepare("SELECT id FROM work_items WHERE transaction_signature = ?").get(signature);
-  return result !== undefined;
+export async function isTransactionUsed(signature: string): Promise<boolean> {
+  await schemaReady;
+  const result = await dbClient.execute(
+    `SELECT id FROM work_items WHERE transaction_signature = ?`,
+    [signature]
+  );
+  return result.rows.length > 0;
 }
 
-// Get pending payment work items created after a specific time
-export function getPendingPaymentItemsAfter(afterTime: string): WorkItem[] {
-  return db.prepare("SELECT * FROM work_items WHERE status = 'pending_payment' AND created_at >= ?").all(afterTime) as WorkItem[];
+export async function getPendingPaymentItemsAfter(afterTime: string): Promise<WorkItem[]> {
+  await schemaReady;
+  const result = await dbClient.execute(
+    `SELECT * FROM work_items WHERE status = 'pending_payment' AND created_at >= ?`,
+    [afterTime]
+  );
+  return result.rows as WorkItem[];
 }
 
-// Delete a work item (only if pending_payment)
-export function deleteWorkItem(id: number): boolean {
-  const result = db.prepare("DELETE FROM work_items WHERE id = ? AND status = 'pending_payment'").run(id);
-  return result.changes > 0;
+export async function deleteWorkItem(id: number): Promise<boolean> {
+  await schemaReady;
+  const result = await dbClient.execute(
+    `DELETE FROM work_items WHERE id = ? AND status = 'pending_payment'`,
+    [id]
+  );
+  return (result.changes || 0) > 0;
 }
