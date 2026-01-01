@@ -670,12 +670,11 @@ app.get("/submit", async (c) => {
       <div class="examples">
         <h3>Example Tasks</h3>
         <div class="example-chips">
-          <span class="example-chip" onclick="setExample('portfolio')">Stock Portfolio Analysis</span>
-          <span class="example-chip" onclick="setExample('businessplan')">AI Startup Business Plan</span>
-          <span class="example-chip" onclick="setExample('webapp')">Full-Stack Web Application</span>
-          <span class="example-chip" onclick="setExample('research')">Market Research Report</span>
-          <span class="example-chip" onclick="setExample('contentcalendar')">Content Marketing Strategy</span>
-          <span class="example-chip" onclick="setExample('automation')">Enterprise Automation Suite</span>
+          <span class="example-chip" onclick="setExample('portfolio')">Tech Stock Portfolio Analysis</span>
+          <span class="example-chip" onclick="setExample('businessplan')">AI Dev Tool Business Plan</span>
+          <span class="example-chip" onclick="setExample('webapp')">Expense Tracker App</span>
+          <span class="example-chip" onclick="setExample('research')">EV Market Research</span>
+          <span class="example-chip" onclick="setExample('contentcalendar')">Fitness Brand Content Strategy</span>
         </div>
       </div>
     </div>
@@ -683,195 +682,166 @@ app.get("/submit", async (c) => {
 
   <script>
     const examples = {
-      portfolio: \`Create a comprehensive stock portfolio analysis tool and report:
+      portfolio: \`Create a comprehensive tech stock portfolio analysis with real holdings:
 
-1. Generate a sample CSV file with 15-20 stocks including: ticker symbol, purchase date, purchase price, current price, shares owned, sector, and dividend yield
+PORTFOLIO DATA (create as CSV):
+Include these actual stocks with realistic purchase data:
+- NVDA (NVIDIA) - 50 shares bought at $450
+- AAPL (Apple) - 100 shares bought at $175
+- MSFT (Microsoft) - 40 shares bought at $380
+- GOOGL (Alphabet) - 25 shares bought at $140
+- AMZN (Amazon) - 30 shares bought at $178
+- META (Meta) - 35 shares bought at $480
+- TSM (Taiwan Semiconductor) - 45 shares bought at $150
+- AVGO (Broadcom) - 20 shares bought at $160
+- AMD (AMD) - 60 shares bought at $145
+- CRM (Salesforce) - 25 shares bought at $270
 
-2. Build a Python analysis script that:
-   - Calculates total portfolio value, cost basis, and overall return
-   - Computes individual stock performance (gain/loss %, annualized return)
-   - Analyzes sector allocation and diversification metrics
-   - Identifies top and bottom performers
-   - Calculates portfolio beta and volatility estimates
-   - Generates dividend income projections
+PYTHON ANALYSIS SCRIPT:
+- Calculate current portfolio value using recent prices
+- Compute individual returns, weighted performance
+- Sector breakdown (semiconductors vs software vs cloud)
+- Concentration risk analysis (NVDA exposure)
+- Dividend yield analysis
+- Beta calculation vs S&P 500
 
-3. Create a detailed markdown report with:
-   - Executive summary with key metrics
-   - Portfolio composition charts (describe in text/ASCII)
-   - Risk analysis and diversification score
-   - Specific rebalancing recommendations
-   - Tax-loss harvesting opportunities
-   - 5 actionable recommendations to optimize the portfolio\`,
+DETAILED REPORT:
+- Executive summary with total gains/losses
+- Winner/loser analysis with specific recommendations
+- Is the portfolio too concentrated in AI/chips?
+- Rebalancing suggestions: what to trim, what to add
+- Tax-loss harvesting opportunities if any positions are down
+- 5 specific action items with rationale\`,
 
-      businessplan: \`Create a comprehensive market analysis and business plan for an AI-powered software development platform (similar to this service). Include:
+      businessplan: \`Create a comprehensive business plan for "CodePilot Pro" - an AI-powered code review and refactoring SaaS tool that integrates with GitHub/GitLab.
+
+PRODUCT CONCEPT:
+- AI analyzes pull requests for bugs, security issues, performance problems
+- Suggests refactoring improvements with one-click apply
+- Learns team coding standards over time
+- Pricing: $29/month individual, $99/month team (5 users), $299/month enterprise
 
 MARKET ANALYSIS:
-- Total addressable market (TAM) sizing with methodology
-- Serviceable addressable market (SAM) breakdown
-- Competitor analysis: identify 10+ competitors, their pricing, features, strengths/weaknesses
-- Market trends and growth projections for AI development tools
-- Customer segmentation and persona development
+- Size the developer tools market (compare to GitHub, GitLab, Snyk revenues)
+- Analyze competitors: Codacy, SonarQube, DeepCode (now Snyk), CodeClimate
+- Identify gaps in current offerings
 
-BUSINESS MODEL:
-- Detailed pricing strategy with unit economics
-- Customer acquisition cost (CAC) estimates by channel
-- Lifetime value (LTV) projections
-- Revenue model and 3-year financial projections
+FINANCIAL MODEL:
+- Build a 3-year revenue projection
+- Assume: 1,000 users Year 1, 5,000 Year 2, 20,000 Year 3
+- Calculate MRR, ARR, churn assumptions
+- Infrastructure costs (OpenAI API, AWS hosting)
 - Break-even analysis
 
-GO-TO-MARKET STRATEGY:
-- Launch phases and milestones
-- Marketing channel priorities with budget allocation
-- Partnership opportunities
-- Content marketing and SEO strategy
+GO-TO-MARKET:
+- Launch strategy targeting open source maintainers first
+- Developer advocate program
+- Integration partnerships with GitHub, VS Code
+- Content marketing: "Code Review Horror Stories" blog series
 
-TECHNICAL ROADMAP:
-- MVP features vs. future releases
-- Infrastructure cost projections
-- Scaling considerations
+COMPETITIVE MOAT:
+- How to defend against GitHub adding this feature natively
+- Data/learning advantages over time\`,
 
-RISK ANALYSIS:
-- Key risks and mitigation strategies
-- Competitive moat analysis
-
-Format as a professional business plan document with executive summary.\`,
-
-      webapp: \`Build a complete full-stack task management web application with the following requirements:
-
-BACKEND (Node.js/Express or Python/FastAPI):
-- RESTful API with full CRUD operations
-- User authentication with JWT tokens and refresh token rotation
-- Password hashing with bcrypt
-- Role-based access control (admin, manager, user)
-- SQLite database with proper schema design
-- Input validation and sanitization
-- Rate limiting middleware
-- Comprehensive error handling
-
-FRONTEND (React or vanilla JS):
-- Responsive dashboard with task boards (Kanban style)
-- User registration and login forms
-- Task creation with title, description, priority, due date, assignee
-- Drag-and-drop task status updates
-- Filter and search functionality
-- User profile management
-- Dark/light theme toggle
+      webapp: \`Build a complete personal expense tracker web application called "SpendWise":
 
 FEATURES:
-- Task comments and activity log
-- Email notifications (mock/console output)
-- Task labels and categories
-- Due date reminders
-- Export tasks to CSV
+- Track expenses by category: Food, Transport, Entertainment, Shopping, Bills, Health
+- Add income sources: Salary, Freelance, Investments, Other
+- Monthly budget setting per category with alerts at 80% and 100%
+- Dashboard with spending trends, category breakdown pie chart
+- Recurring expense tracking (Netflix $15.99, Spotify $10.99, Gym $49)
 
-Include setup instructions, environment configuration, and sample data.\`,
+TECH STACK:
+- Backend: Node.js with Express, SQLite database
+- Frontend: Vanilla JavaScript with Chart.js for visualizations
+- Authentication: Simple email/password with sessions
 
-      research: \`Conduct comprehensive market research on the AI coding assistant industry and produce a detailed report:
+SAMPLE DATA:
+Pre-populate with 3 months of realistic expense data:
+- Rent: $1,800/month
+- Groceries: $400-500/month (variable)
+- Dining out: $200-350/month
+- Gas: $150/month
+- Subscriptions: Netflix, Spotify, iCloud, gym
+- Random purchases: Amazon, clothing, etc.
 
-INDUSTRY OVERVIEW:
-- Define the market and key segments
-- Historical growth and current market size
-- Key players and market share estimates
-- Technology stack analysis (LLMs, IDEs, deployment)
+REPORTS:
+- Monthly summary email template
+- Year-over-year comparison
+- "Where can I cut back?" AI suggestions based on spending patterns
+- Export to CSV for tax purposes
 
-COMPETITIVE LANDSCAPE:
-- Detailed profiles of top 10 competitors (GitHub Copilot, Cursor, Codeium, Tabnine, Amazon CodeWhisperer, etc.)
-- Feature comparison matrix
-- Pricing comparison table
-- User review sentiment analysis
-- SWOT analysis for each major player
+Include complete setup instructions and a demo account.\`,
 
-TRENDS & INSIGHTS:
-- Emerging technologies and capabilities
-- Enterprise vs. individual adoption patterns
-- Integration trends (IDE plugins, CLI tools, web apps)
-- Open source vs. proprietary models
-- Privacy and security considerations
+      research: \`Conduct comprehensive market research on the Electric Vehicle (EV) industry for a potential investor:
 
-FUTURE OUTLOOK:
-- 5-year growth projections with methodology
-- Potential disruptions and wildcards
-- Consolidation predictions
-- Regulatory considerations
+MARKET OVERVIEW:
+- Global EV market size 2024 and projected 2030
+- Growth rates by region: US, Europe, China
+- EV adoption curves vs ICE vehicle decline
 
-RECOMMENDATIONS:
-- Market entry opportunities
-- Underserved segments
-- Differentiation strategies
+MAJOR PLAYERS ANALYSIS:
+Create detailed profiles for:
+- Tesla: market share, margins, competitive advantages, risks
+- BYD: China dominance, international expansion, vertical integration
+- Rivian: commercial fleet strategy, Amazon partnership, cash runway
+- Lucid: luxury positioning, Saudi backing, production challenges
+- Legacy automakers: Ford F-150 Lightning, GM Ultium, VW ID series
 
-Format with executive summary, detailed sections, data tables, and citations.\`,
+SUPPLY CHAIN DEEP DIVE:
+- Battery manufacturers: CATL, LG Energy, Panasonic, BYD
+- Lithium/cobalt/nickel supply constraints
+- Charging infrastructure: ChargePoint, EVgo, Tesla Supercharger network
 
-      contentcalendar: \`Develop a comprehensive 3-month content marketing strategy and calendar for a B2B SaaS company selling AI development tools. Include:
+INVESTMENT THESIS:
+- Bull case vs bear case for EV sector
+- Which segments are overvalued vs undervalued?
+- Best pure-play investments vs diversified exposure
+- Risks: competition, commoditization, regulatory changes
 
-CONTENT STRATEGY:
-- Target audience analysis with 3 detailed buyer personas
-- Content pillars and themes aligned with buyer journey
-- SEO keyword research (provide 50+ target keywords with search intent)
-- Competitor content gap analysis
-- Content distribution channel strategy
+SPECIFIC RECOMMENDATIONS:
+- Top 3 stocks to buy with price targets
+- Top 2 stocks to avoid with reasoning
+- ETF alternatives for diversified exposure (DRIV, IDRV, LIT)\`,
 
-CONTENT CALENDAR (12 weeks):
-For each week, specify:
-- 2 blog posts (titles, outlines, target keywords, word count)
-- 5 social media posts per platform (LinkedIn, Twitter/X, specific copy)
-- 1 email newsletter topic and outline
-- Any additional content (case studies, whitepapers, webinars)
+      contentcalendar: \`Develop a 3-month content marketing strategy for "IronFit" - a premium fitness app targeting busy professionals aged 30-45:
 
-BLOG POSTS (write 3 complete posts):
-1. Thought leadership piece (2000+ words)
-2. How-to tutorial with code examples (1500+ words)
-3. Industry trends analysis (1500+ words)
+BRAND POSITIONING:
+- "Executive fitness for people who don't have time for the gym"
+- 20-minute science-backed workouts
+- Competitors: Peloton, Apple Fitness+, Nike Training Club
 
-SOCIAL MEDIA TEMPLATES:
-- 10 LinkedIn post templates
-- 15 Twitter/X thread starters
-- 5 engagement post formats
+BUYER PERSONAS:
+1. "Busy Brian" - 38, VP of Sales, travels 2x/month, wants hotel room workouts
+2. "Working Mom Sarah" - 34, marketing manager, needs early morning routines before kids wake
+3. "Desk-Bound David" - 42, software engineer, back pain, wants posture correction
 
-MEASUREMENT:
-- KPIs and success metrics
-- Reporting template
-- A/B testing recommendations
+12-WEEK CONTENT CALENDAR:
+Create specific content for each week including:
+- Blog post titles with outlines
+- Instagram posts (carousel ideas, Reels concepts)
+- LinkedIn articles for professional audience
+- Email sequences for free trial nurturing
 
-Deliver as a structured document with the calendar in a table format.\`,
+WRITE 3 COMPLETE BLOG POSTS:
 
-      automation: \`Create a comprehensive enterprise automation suite with multiple integrated scripts:
+1. "The 20-Minute Executive Workout: How CEOs Stay Fit" (2000 words)
+   - Interview-style with productivity tips
+   - Specific workout routine included
 
-1. INFRASTRUCTURE MONITORING SYSTEM:
-- Server health check script (CPU, memory, disk, network)
-- Service availability monitoring (HTTP endpoints, database connections)
-- Log aggregation and error detection
-- Alert system with configurable thresholds
-- Daily/weekly summary report generation
+2. "Fix Your Desk Posture: A 10-Minute Daily Routine" (1500 words)
+   - Step-by-step exercises with descriptions
+   - Before/after transformation stories
 
-2. BACKUP AND DISASTER RECOVERY:
-- Incremental backup system for databases and files
-- Rotation policy (daily/weekly/monthly retention)
-- Backup verification and integrity checks
-- Restore procedure scripts with testing
-- Off-site sync simulation
+3. "Fitness After 40: What Changes and How to Adapt" (1500 words)
+   - Science-backed recovery recommendations
+   - Injury prevention focus
 
-3. DEPLOYMENT AUTOMATION:
-- Git-based deployment pipeline script
-- Environment configuration management
-- Database migration runner
-- Rollback capabilities
-- Deployment notification system
-
-4. SECURITY AUTOMATION:
-- SSL certificate expiration checker
-- Failed login attempt monitor
-- Firewall rule auditor
-- Dependency vulnerability scanner
-- Security report generator
-
-5. DOCUMENTATION:
-- Complete README with setup instructions
-- Configuration file templates
-- Cron job scheduling guide
-- Troubleshooting runbook
-- Architecture diagram (ASCII)
-
-All scripts should be production-ready with proper error handling, logging, and configuration files.\`
+SOCIAL MEDIA:
+- 20 Instagram caption templates
+- 10 LinkedIn post templates for B2B partnerships
+- Influencer collaboration pitch template\`
     };
 
     function setExample(type) {
